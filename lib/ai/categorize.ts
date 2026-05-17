@@ -13,7 +13,23 @@ export interface CategorizationResult {
 }
 
 export const INCOME_CATEGORIES = ["Цалин", "Шилжүүлэг хүлээн авсан", "Буцаалт", "Хүү", "Бусад орлого"];
-export const EXPENSE_CATEGORIES = ["Хоол & Ресторан", "Тээвэр", "Худалдаа", "Коммунал", "Эрүүл мэнд", "Боловсрол", "Цэвэрлэгээ & Засвар", "Бусад зарлага"];
+export const EXPENSE_CATEGORIES = ["Банкны шимтгэл", "Цалин зарлага", "Хоол & Ресторан", "Тээвэр", "Худалдаа", "Коммунал", "Эрүүл мэнд", "Боловсрол", "Цэвэрлэгээ & Засвар", "Татвар", "Бусад зарлага"];
+
+// Тогтсон keyword-уудаас түрүүлж шууд таних (AI-ас илүү найдвартай)
+const KEYWORD_RULES: Array<{ pattern: RegExp; type: "income" | "expense"; category: string }> = [
+  { pattern: /шимтгэл|комисс|service\s*fee|bank\s*fee|шил.+гээний\s*шимтгэл/i, type: "expense", category: "Банкны шимтгэл" },
+  { pattern: /цалин|tsalin|salary|payroll|tsali?n/i, type: "expense", category: "Цалин зарлага" },
+  { pattern: /татвар|tatvar|tax|нийгмийн.*даатгал/i, type: "expense", category: "Татвар" },
+];
+
+function matchKeyword(description: string, type: "income" | "expense"): string | null {
+  for (const rule of KEYWORD_RULES) {
+    if (rule.type === type && rule.pattern.test(description)) {
+      return rule.category;
+    }
+  }
+  return null;
+}
 
 function fallback(transactions: TransactionInput[]): CategorizationResult[] {
   const incomeKeywords = /цалин|орлого|хүлээн|буцаалт|хүү|deposit|credit|salary|income|зээл олголт/i;
@@ -71,19 +87,40 @@ export async function categorizeTransactions(
 ): Promise<CategorizationResult[]> {
   if (transactions.length === 0) return [];
 
-  const BATCH_SIZE = 30;
-  const results: CategorizationResult[] = [];
+  // Эхлээд keyword-аар таних — танигдсаныг AI-руу явуулахгүй
+  const results: (CategorizationResult | null)[] = transactions.map(t => {
+    const type: "income" | "expense" = t.amount >= 0 ? "income" : "expense";
+    const matched = matchKeyword(t.description, type);
+    return matched ? { type, category: matched } : null;
+  });
 
-  for (let i = 0; i < transactions.length; i += BATCH_SIZE) {
-    const batch = transactions.slice(i, i + BATCH_SIZE);
+  // AI-руу зөвхөн танигдаагүйг илгээх
+  const aiNeededIdx: number[] = results
+    .map((r, i) => r === null ? i : -1)
+    .filter(i => i >= 0);
+
+  if (aiNeededIdx.length === 0) {
+    return results as CategorizationResult[];
+  }
+
+  const BATCH_SIZE = 30;
+  const aiInputs = aiNeededIdx.map(i => transactions[i]);
+  const aiResults: CategorizationResult[] = [];
+
+  for (let i = 0; i < aiInputs.length; i += BATCH_SIZE) {
+    const batch = aiInputs.slice(i, i + BATCH_SIZE);
     try {
-      const batchResult = await categorizeBatch(batch);
-      results.push(...batchResult);
+      aiResults.push(...await categorizeBatch(batch));
     } catch (err) {
-      console.error(`Batch ${i}-${i + BATCH_SIZE} categorization failed:`, err);
-      results.push(...fallback(batch));
+      console.error(`AI batch ${i}-${i + BATCH_SIZE} failed:`, err);
+      aiResults.push(...fallback(batch));
     }
   }
 
-  return results;
+  // Үр дүнг нэгтгэх
+  aiNeededIdx.forEach((origIdx, i) => {
+    results[origIdx] = aiResults[i] ?? fallback([transactions[origIdx]])[0];
+  });
+
+  return results as CategorizationResult[];
 }

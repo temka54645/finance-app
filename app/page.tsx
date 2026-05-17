@@ -4,7 +4,10 @@ import { useState, useEffect, useCallback } from "react";
 import { BarChart2, ChevronDown, RefreshCw } from "lucide-react";
 import FileUpload from "@/components/FileUpload";
 import SummaryCards from "@/components/SummaryCards";
+import HighlightCards from "@/components/HighlightCards";
 import TransactionTable from "@/components/TransactionTable";
+
+interface Highlight { amount: number; count: number }
 
 interface Report {
   totalIncome: number;
@@ -12,6 +15,12 @@ interface Report {
   balance: number;
   incomeCount: number;
   expenseCount: number;
+  highlights: {
+    bankFees: Highlight;
+    salaryPaid: Highlight;
+    taxes: Highlight;
+    salaryReceived: Highlight;
+  };
   byCategory: { category: string; type: string; _sum: { amount: number }; _count: number }[];
   statements: { id: string; fileName: string; bankName?: string; uploadedAt: string }[];
 }
@@ -77,13 +86,23 @@ export default function Home() {
 
       <main className="max-w-6xl mx-auto px-6 py-6 space-y-6">
         {report && (
-          <SummaryCards
-            totalIncome={report.totalIncome}
-            totalExpense={report.totalExpense}
-            balance={report.balance}
-            incomeCount={report.incomeCount}
-            expenseCount={report.expenseCount}
-          />
+          <>
+            <SummaryCards
+              totalIncome={report.totalIncome}
+              totalExpense={report.totalExpense}
+              balance={report.balance}
+              incomeCount={report.incomeCount}
+              expenseCount={report.expenseCount}
+            />
+            {report.highlights && (
+              <HighlightCards
+                bankFees={report.highlights.bankFees}
+                salaryPaid={report.highlights.salaryPaid}
+                taxes={report.highlights.taxes}
+                salaryReceived={report.highlights.salaryReceived}
+              />
+            )}
+          </>
         )}
 
         {report?.statements && report.statements.length > 0 && (
