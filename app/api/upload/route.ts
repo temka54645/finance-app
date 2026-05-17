@@ -6,6 +6,10 @@ import { parseWithBankDetection } from "@/lib/parsers/banks";
 import { categorizeTransactions } from "@/lib/ai/categorize";
 import { aiExtractTransactions } from "@/lib/ai/extract";
 
+// Том файл upload-ыг зөвшөөрөх
+export const maxDuration = 120; // секунд
+export const runtime = "nodejs";
+
 export async function POST(req: NextRequest) {
   try {
     const formData = await req.formData();

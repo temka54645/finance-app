@@ -21,9 +21,24 @@ export default function FileUpload({ onSuccess }: Props) {
       formData.append("file", file);
       if (bankName) formData.append("bankName", bankName);
 
-      const res = await fetch("/api/upload", { method: "POST", body: formData });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? "Алдаа гарлаа");
+      let res: Response;
+      try {
+        res = await fetch("/api/upload", { method: "POST", body: formData });
+      } catch (netErr) {
+        throw new Error(
+          `Сүлжээний алдаа: серверт хүрэх боломжгүй. Серверийн terminal-д ${netErr instanceof Error ? netErr.message : "алдаа"} харагдсан эсэхийг шалгана уу.`
+        );
+      }
+
+      const text = await res.text();
+      let data: { error?: string; count?: number };
+      try {
+        data = text ? JSON.parse(text) : {};
+      } catch {
+        throw new Error(`Сервер буцаасан хариу JSON биш: ${text.slice(0, 200)}`);
+      }
+
+      if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`);
       onSuccess();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Алдаа гарлаа");

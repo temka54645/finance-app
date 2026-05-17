@@ -67,11 +67,17 @@ ${JSON.stringify(batch.map((t, i) => ({ i, desc: t.description, amount: t.amount
 Зөвхөн JSON массив буцаа:
 [{"type":"income","category":"Цалин"},{"type":"expense","category":"Хоол & Ресторан"}]`;
 
-  const response = await client.messages.create({
-    model: "claude-haiku-4-5-20251001",
-    max_tokens: 2048,
-    messages: [{ role: "user", content: prompt }],
-  });
+  // 30 секундын timeout
+  const response = await Promise.race([
+    client.messages.create({
+      model: "claude-haiku-4-5-20251001",
+      max_tokens: 2048,
+      messages: [{ role: "user", content: prompt }],
+    }),
+    new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error("AI timeout (30s)")), 30000)
+    ),
+  ]);
 
   const text = response.content[0].type === "text" ? response.content[0].text : "";
   const jsonMatch = text.match(/\[[\s\S]*\]/);
