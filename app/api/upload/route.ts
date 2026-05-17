@@ -65,14 +65,23 @@ export async function POST(req: NextRequest) {
         bankName: finalBankName || null,
         transactions: {
           create: parsed.map((t, i) => {
-            const cat = categorized[i];
-            const fallbackType = t.amount >= 0 ? "income" : "expense";
+            // Parser-ийн дохио = эцсийн шийдвэр (банкны хуулга дотрох
+            // Орлого/Зарлага багана хамгийн найдвартай эх сурвалж).
+            // AI зөвхөн категори нэр санал болгох (харин income/expense биш).
+            const type: "income" | "expense" = t.amount >= 0 ? "income" : "expense";
+            const aiCat = categorized[i];
+
+            // AI category-ийг зөвхөн төрөл нь parser-тэй таарсан тохиолдолд авна
+            const category = (aiCat && aiCat.type === type)
+              ? aiCat.category
+              : (type === "income" ? "Бусад орлого" : "Бусад зарлага");
+
             return {
               date: t.date,
               description: t.description,
               amount: Math.abs(t.amount),
-              type: cat?.type ?? fallbackType,
-              category: cat?.category ?? (fallbackType === "income" ? "Бусад орлого" : "Бусад зарлага"),
+              type,
+              category,
             };
           }),
         },

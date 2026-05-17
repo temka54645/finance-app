@@ -35,21 +35,21 @@ function fallback(transactions: TransactionInput[]): CategorizationResult[] {
 }
 
 async function categorizeBatch(batch: TransactionInput[]): Promise<CategorizationResult[]> {
-  const prompt = `Монгол банкны гүйлгээнүүдийг ангил. Зөвхөн JSON массив буцаа, өөр текст бүү нэм.
+  const prompt = `Монгол банкны гүйлгээний категори тодорхойл. Эерэг дүн = орлого, сөрөг дүн = зарлага (энэ нь parser-аас тогтоогдсон, өөрчилж болохгүй).
 
 Орлогын категори: ${INCOME_CATEGORIES.join(", ")}
 Зарлагын категори: ${EXPENSE_CATEGORIES.join(", ")}
 
-Дүрэм:
-- Цалин, шилжүүлэг хүлээн авсан, буцаалт → income
-- Худалдан авалт, төлбөр, хоол, тээвэр → expense
-- Тайлбараас голлон шийд, дүнгийн тэмдгийг туслах дохио болгон ашигла
-
 Гүйлгээнүүд:
 ${JSON.stringify(batch.map((t, i) => ({ i, desc: t.description, amount: t.amount })))}
 
-Формат (яг ийм байх ёстой):
-[{"type":"expense","category":"Хоол & Ресторан"},{"type":"income","category":"Цалин"}]`;
+Дүрэм:
+- Хэрэв amount >= 0 → type заавал "income", категори орлогын жагсаалтаас
+- Хэрэв amount < 0 → type заавал "expense", категори зарлагын жагсаалтаас
+- Тайлбараас хамгийн тохиромжтой категори сонг
+
+Зөвхөн JSON массив буцаа:
+[{"type":"income","category":"Цалин"},{"type":"expense","category":"Хоол & Ресторан"}]`;
 
   const response = await client.messages.create({
     model: "claude-haiku-4-5-20251001",
