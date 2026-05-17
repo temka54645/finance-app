@@ -5,6 +5,7 @@ import { BarChart2, ChevronDown, RefreshCw } from "lucide-react";
 import FileUpload from "@/components/FileUpload";
 import SummaryCards from "@/components/SummaryCards";
 import HighlightCards from "@/components/HighlightCards";
+import UncategorizedSection from "@/components/UncategorizedSection";
 import TransactionTable from "@/components/TransactionTable";
 
 interface Highlight { amount: number; count: number }
@@ -21,6 +22,7 @@ interface Report {
     taxes: Highlight;
     salaryReceived: Highlight;
   };
+  uncategorizedCount: number;
   byCategory: { category: string; type: string; _sum: { amount: number }; _count: number }[];
   statements: { id: string; fileName: string; bankName?: string; uploadedAt: string }[];
 }
@@ -100,6 +102,13 @@ export default function Home() {
                 salaryPaid={report.highlights.salaryPaid}
                 taxes={report.highlights.taxes}
                 salaryReceived={report.highlights.salaryReceived}
+              />
+            )}
+            {report.uncategorizedCount > 0 && (
+              <UncategorizedSection
+                statementId={selectedStatement}
+                count={report.uncategorizedCount}
+                onUpdate={fetchData}
               />
             )}
           </>

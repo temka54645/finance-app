@@ -7,11 +7,14 @@ export async function GET(req: NextRequest) {
 
   const where = statementId ? { statementId } : {};
 
-  const [incomeAgg, expenseAgg, byCategory, statements] = await Promise.all([
+  const UNCATEGORIZED = ["Бусад орлого", "Бусад зарлага", "Ангилаагүй"];
+
+  const [incomeAgg, expenseAgg, byCategory, statements, uncategorizedCount] = await Promise.all([
     prisma.transaction.aggregate({ where: { ...where, type: "income" }, _sum: { amount: true }, _count: true }),
     prisma.transaction.aggregate({ where: { ...where, type: "expense" }, _sum: { amount: true }, _count: true }),
     prisma.transaction.groupBy({ by: ["category", "type"], where, _sum: { amount: true }, _count: true }),
     prisma.statement.findMany({ orderBy: { uploadedAt: "desc" }, select: { id: true, fileName: true, bankName: true, uploadedAt: true } }),
+    prisma.transaction.count({ where: { ...where, category: { in: UNCATEGORIZED } } }),
   ]);
 
   const totalIncome = incomeAgg._sum.amount ?? 0;
@@ -40,6 +43,7 @@ export async function GET(req: NextRequest) {
     incomeCount: incomeAgg._count,
     expenseCount: expenseAgg._count,
     highlights,
+    uncategorizedCount,
     byCategory,
     statements,
   });
