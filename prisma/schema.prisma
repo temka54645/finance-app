@@ -1,0 +1,29 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../app/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model Statement {
+  id           String        @id @default(cuid())
+  fileName     String
+  bankName     String?
+  uploadedAt   DateTime      @default(now())
+  transactions Transaction[]
+}
+
+model Transaction {
+  id          String    @id @default(cuid())
+  statementId String
+  statement   Statement @relation(fields: [statementId], references: [id], onDelete: Cascade)
+  date        DateTime
+  description String
+  amount      Float
+  type        String
+  category    String    @default("Ангилаагүй")
+  note        String?
+  createdAt   DateTime  @default(now())
+}
