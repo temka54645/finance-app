@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { parsePDF } from "@/lib/parsers/pdf";
-import { parseExcel, parseCSV } from "@/lib/parsers/excel";
+import { parseExcel, parseCSV, extractRawRows, type ParsedTransaction } from "@/lib/parsers/excel";
 import { categorizeTransactions } from "@/lib/ai/categorize";
+import { aiExtractTransactions } from "@/lib/ai/extract";
 
 export async function POST(req: NextRequest) {
   try {
@@ -18,7 +19,7 @@ export async function POST(req: NextRequest) {
     const fileName = file.name;
     const ext = fileName.split(".").pop()?.toLowerCase();
 
-    let parsed: Awaited<ReturnType<typeof parsePDF>>;
+    let parsed: ParsedTransaction[] = [];
 
     if (ext === "pdf") {
       parsed = await parsePDF(buffer);
@@ -30,8 +31,20 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Дэмжигдэхгүй файлын төрөл" }, { status: 400 });
     }
 
+    console.log(`[upload] ${fileName}: heuristic parser found ${parsed.length} transactions`);
+
+    // Heuristic parser амжилтгүй бол AI ашиглах (зөвхөн Excel/CSV-д)
+    if (parsed.length === 0 && (ext === "xlsx" || ext === "xls" || ext === "csv")) {
+      console.log(`[upload] ${fileName}: falling back to AI parser`);
+      const rawRows = extractRawRows(buffer);
+      parsed = await aiExtractTransactions(rawRows);
+      console.log(`[upload] ${fileName}: AI parser found ${parsed.length} transactions`);
+    }
+
     if (parsed.length === 0) {
-      return NextResponse.json({ error: "Гүйлгээ олдсонгүй" }, { status: 422 });
+      return NextResponse.json({
+        error: "Гүйлгээ олдсонгүй. Файлын форматыг шалгана уу."
+      }, { status: 422 });
     }
 
     const categorized = await categorizeTransactions(
@@ -45,7 +58,6 @@ export async function POST(req: NextRequest) {
         transactions: {
           create: parsed.map((t, i) => {
             const cat = categorized[i];
-            // parser-ийн amount тэмдэг: эерэг=орлого, сөрөг=зарлага
             const fallbackType = t.amount >= 0 ? "income" : "expense";
             return {
               date: t.date,
@@ -60,9 +72,15 @@ export async function POST(req: NextRequest) {
       include: { transactions: true },
     });
 
-    return NextResponse.json({ statement });
+    return NextResponse.json({
+      statement,
+      count: statement.transactions.length,
+      incomeCount: statement.transactions.filter(t => t.type === "income").length,
+      expenseCount: statement.transactions.filter(t => t.type === "expense").length,
+    });
   } catch (err) {
-    console.error(err);
-    return NextResponse.json({ error: "Серверийн алдаа" }, { status: 500 });
+    console.error("[upload] error:", err);
+    const message = err instanceof Error ? err.message : "Серверийн алдаа";
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
