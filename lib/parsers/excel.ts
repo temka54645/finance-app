@@ -47,139 +47,135 @@ function isText(val: unknown): boolean {
   return s.length > 1 && parseDate(s) === null && parseAmount(s) === null;
 }
 
-// ── Аль ч мөрөөс гүйлгээ задлах ───────────────────────────────────
+// ── Header нэрээр тодорхой багана таних ─────────────────────────
 
-interface RowAnalysis {
-  date: Date | null;
-  texts: string[];
-  numbers: { col: string; val: number }[];
+interface ColMap {
+  dateCol: string | null;
+  descCol: string | null;
+  amountCol: string | null;
+  creditCol: string | null;
+  debitCol: string | null;
+  balanceCol: string | null;
 }
 
-function analyzeRow(row: Record<string, unknown>): RowAnalysis {
-  const result: RowAnalysis = { date: null, texts: [], numbers: [] };
+const RE = {
+  date: /огноо|date|дата|өдөр/i,
+  desc: /утга|тайлбар|нарийвч|narration|description|particulars|memo|reference/i,
+  credit: /орлого|credit|incoming|deposit|кредит|орсон/i,
+  debit: /зарлага|debit|outgoing|withdrawal|дебит|гарсан/i,
+  amount: /дүн|amount|мөнгө|sum|нийт/i,
+  balance: /үлдэгдэл|balance|остаток/i,
+};
 
-  for (const [col, val] of Object.entries(row)) {
-    if (!result.date) {
-      const d = parseDate(val);
-      if (d) { result.date = d; continue; }
-    }
-    const n = parseAmount(val);
-    if (n !== null) {
-      result.numbers.push({ col, val: n });
-      continue;
-    }
-    if (isText(val)) {
-      result.texts.push(String(val).trim());
-    }
-  }
-
-  return result;
+function detectByHeaders(headers: string[]): ColMap {
+  const find = (re: RegExp) => headers.find(h => re.test(h)) ?? null;
+  return {
+    dateCol:    find(RE.date),
+    descCol:    find(RE.desc),
+    creditCol:  find(RE.credit),
+    debitCol:   find(RE.debit),
+    amountCol:  find(RE.amount),
+    balanceCol: find(RE.balance),
+  };
 }
 
-// ── Sheet-ийн бүтцийг ойлгох (2-р хүртэлх тоон багана) ────────────
-
-function detectAmountStrategy(rows: Record<string, unknown>[]): {
-  strategy: "credit-debit" | "single";
-  creditCol?: string;
-  debitCol?: string;
-} {
-  // Бүх мөрөнд хэдэн тоон багана идэвхтэй байгааг тоолно
-  const colNumberCounts: Record<string, number> = {};
-  for (const row of rows) {
-    for (const [col, val] of Object.entries(row)) {
-      if (parseAmount(val) !== null && parseDate(val) === null) {
-        colNumberCounts[col] = (colNumberCounts[col] ?? 0) + 1;
-      }
-    }
-  }
-
-  // Хамгийн идэвхтэй 2 тоон багана олох
-  const topNumCols = Object.entries(colNumberCounts)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 3)
-    .map(([col]) => col);
-
-  if (topNumCols.length < 2) return { strategy: "single" };
-
-  // Багануудын нэрээр credit/debit таних
-  const headers = topNumCols.map(c => c.toLowerCase());
-  const creditIdx = headers.findIndex(h => /орлого|credit|incoming|хүлээн|deposit|кредит|орсон/.test(h));
-  const debitIdx = headers.findIndex(h => /зарлага|debit|outgoing|төлсөн|withdrawal|дебит|гарсан/.test(h));
-
-  if (creditIdx >= 0 && debitIdx >= 0) {
-    return {
-      strategy: "credit-debit",
-      creditCol: topNumCols[creditIdx],
-      debitCol: topNumCols[debitIdx],
-    };
-  }
-
-  // Хоёр идэвхтэй тоон багана байгаа боловч нэр нь танигдаагүй —
-  // ихэвчлэн эхнийх нь орлого, хоёр дахь нь зарлага гэж үздэг
-  // (МНБ-ны стандарт), гэхдээ найдваргүй учир single ашиглана
-  return { strategy: "single" };
-}
+// ── Гүйлгээ бүтээх ───────────────────────────────────────────────
 
 function buildTransaction(
   row: Record<string, unknown>,
-  strategy: ReturnType<typeof detectAmountStrategy>
+  cols: ColMap
 ): ParsedTransaction | null {
-  const analysis = analyzeRow(row);
-  if (!analysis.date) return null;
+  const date = cols.dateCol ? parseDate(row[cols.dateCol]) : null;
+  if (!date) return null;
 
   let amount: number | null = null;
 
-  if (strategy.strategy === "credit-debit" && strategy.creditCol && strategy.debitCol) {
-    const credit = parseAmount(row[strategy.creditCol]);
-    const debit = parseAmount(row[strategy.debitCol]);
+  if (cols.creditCol && cols.debitCol) {
+    const credit = parseAmount(row[cols.creditCol]);
+    const debit = parseAmount(row[cols.debitCol]);
     if (credit && Math.abs(credit) > 0) amount = Math.abs(credit);
     else if (debit && Math.abs(debit) > 0) amount = -Math.abs(debit);
+  } else if (cols.amountCol) {
+    amount = parseAmount(row[cols.amountCol]);
   } else {
-    // Хамгийн их үнэмлэхүй утгатай тоог гүйлгээний дүн гэж үзнэ
-    // (Үлдэгдэл нь ихэвчлэн их боловч statement-д нэг л байх ёстой)
-    const candidates = analysis.numbers.filter(n => Math.abs(n.val) > 0);
-    if (candidates.length === 0) return null;
-    // Эхний тоог авна (ихэвчлэн үлдэгдэл сүүлд байдаг)
-    amount = candidates[0].val;
+    // ямар ч багана танигдаагүй бол үлдэгдэл бус хамгийн их тоог сонгох
+    for (const [col, val] of Object.entries(row)) {
+      if (col === cols.balanceCol || col === cols.dateCol || col === cols.descCol) continue;
+      const n = parseAmount(val);
+      if (n !== null) { amount = n; break; }
+    }
   }
 
   if (amount === null || amount === 0) return null;
 
-  // Тайлбар: хамгийн урт текст
-  const description = analysis.texts.sort((a, b) => b.length - a.length)[0] ?? "Гүйлгээ";
+  // Тайлбар: descCol эсвэл хамгийн урт текст (огноо/тоо биш)
+  let description = "";
+  if (cols.descCol) {
+    description = String(row[cols.descCol] ?? "").trim();
+  }
+  if (!description) {
+    const texts: string[] = [];
+    for (const [col, val] of Object.entries(row)) {
+      if (col === cols.dateCol || col === cols.balanceCol || col === cols.creditCol
+        || col === cols.debitCol || col === cols.amountCol) continue;
+      if (isText(val)) texts.push(String(val).trim());
+    }
+    description = texts.sort((a, b) => b.length - a.length)[0] ?? "Гүйлгээ";
+  }
 
-  return { date: analysis.date, description, amount };
+  return { date, description: description || "Гүйлгээ", amount };
 }
 
-// ── Header мөрийг тогтоох (хэд хэдийг туршина) ────────────────────
+// ── Header offset-ийн чанарыг үнэлэх ──────────────────────────────
 
-function tryParseAtOffset(sheet: XLSX.WorkSheet, offset: number): ParsedTransaction[] {
+interface OffsetResult {
+  transactions: ParsedTransaction[];
+  confidence: number; // 0-100
+}
+
+function tryParseAtOffset(sheet: XLSX.WorkSheet, offset: number): OffsetResult {
   const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, {
     defval: "",
     range: offset,
   });
+  if (rows.length === 0) return { transactions: [], confidence: 0 };
 
-  if (rows.length === 0) return [];
+  const headers = Object.keys(rows[0]);
+  const cols = detectByHeaders(headers);
 
-  const strategy = detectAmountStrategy(rows);
-  const results: ParsedTransaction[] = [];
+  // Confidence score
+  let confidence = 0;
+  if (cols.dateCol) confidence += 20;
+  if (cols.descCol) confidence += 20;
+  if (cols.creditCol && cols.debitCol) confidence += 40;
+  else if (cols.amountCol) confidence += 30;
+  if (cols.balanceCol) confidence += 10; // үлдэгдэл байх нь сайн дохио (тэгээд бид түүнийг үл ашиглана)
 
+  const transactions: ParsedTransaction[] = [];
   for (const row of rows) {
-    const tx = buildTransaction(row, strategy);
-    if (tx) results.push(tx);
+    const tx = buildTransaction(row, cols);
+    if (tx) transactions.push(tx);
   }
 
-  return results;
+  return { transactions, confidence };
 }
 
 function parseSheet(sheet: XLSX.WorkSheet): ParsedTransaction[] {
-  // 0-10 хүртэлх offset-уудыг туршиж хамгийн их гүйлгээтэйг сонгоно
-  let best: ParsedTransaction[] = [];
-  for (let offset = 0; offset <= 10; offset++) {
+  let best: OffsetResult = { transactions: [], confidence: 0 };
+
+  for (let offset = 0; offset <= 15; offset++) {
     const result = tryParseAtOffset(sheet, offset);
-    if (result.length > best.length) best = result;
+    // Эхлээд confidence, дараа нь гүйлгээний тоогоор сонгох
+    if (
+      result.transactions.length > 0 &&
+      (result.confidence > best.confidence ||
+        (result.confidence === best.confidence && result.transactions.length > best.transactions.length))
+    ) {
+      best = result;
+    }
   }
-  return best;
+
+  return best.transactions;
 }
 
 // ── Public API ────────────────────────────────────────────────────
@@ -199,8 +195,6 @@ export function parseCSV(buffer: Buffer): ParsedTransaction[] {
   const sheet = workbook.Sheets[workbook.SheetNames[0]];
   return parseSheet(sheet);
 }
-
-// ── AI-аар task тэрхэн raw data-аас гүйлгээ задлах (fallback) ─────
 
 export function extractRawRows(buffer: Buffer): unknown[][] {
   const workbook = XLSX.read(buffer, { type: "buffer", cellDates: true });
