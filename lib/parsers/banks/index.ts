@@ -1,4 +1,5 @@
 import { XAC_BANK, parseXacBank } from "./xac";
+import { TDB_BANK, parseTdbBank } from "./tdb";
 import { parseExcel, extractRawRows, type ParsedTransaction } from "../excel";
 
 export interface BankTemplate {
@@ -11,7 +12,8 @@ export interface BankTemplate {
 // Бүртгэгдсэн банкны template-ууд
 const BANK_TEMPLATES: BankTemplate[] = [
   { ...XAC_BANK, parse: parseXacBank },
-  // Энд цаашид Khan, TDB, Golomt гэх мэт нэмж болно
+  { ...TDB_BANK, parse: parseTdbBank },
+  // Цаашид Khan, Golomt гэх мэт нэмж болно
 ];
 
 export interface ParseResult {

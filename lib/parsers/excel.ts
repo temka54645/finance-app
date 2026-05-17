@@ -23,11 +23,9 @@ function parseAmount(val: unknown): number | null {
 
 function parseDate(val: unknown): Date | null {
   if (val instanceof Date && !isNaN(val.getTime()) && val.getFullYear() > 2000) return val;
-  if (typeof val === "number" && val > 1000 && val < 100000) {
-    try {
-      const d = XLSX.SSF.parse_date_code(val);
-      if (d && d.y > 2000) return new Date(d.y, d.m - 1, d.d);
-    } catch { /* ignore */ }
+  if (typeof val === "number" && val > 25569 && val < 100000) {
+    const d = new Date(Math.round((val - 25569) * 86400 * 1000));
+    if (!isNaN(d.getTime()) && d.getFullYear() > 2000) return d;
   }
   if (typeof val === "string") {
     const s = val.trim();
