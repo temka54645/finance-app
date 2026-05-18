@@ -33,7 +33,7 @@ const providers: Provider[] = [
       const ok = await bcrypt.compare(parsed.data.password, user.hashedPassword);
       if (!ok) return null;
 
-      return { id: user.id, email: user.email, name: user.name };
+      return { id: user.id, email: user.email, name: user.name, userType: user.userType };
     },
   }),
 ];
@@ -56,13 +56,26 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   },
   providers,
   callbacks: {
-    jwt: ({ token, user }) => {
-      if (user) token.id = user.id;
+    jwt: async ({ token, user, trigger }) => {
+      // Шинэ login → user-аас id+userType-ыг token-руу хадгална
+      if (user) {
+        token.id = user.id;
+        token.userType = (user as { userType?: string | null }).userType ?? null;
+      }
+      // session update үед (onboarding-ийн дараа гэх мэт) DB-аас дахин уншина
+      if (trigger === "update" && token.id) {
+        const u = await prisma.user.findUnique({
+          where: { id: token.id as string },
+          select: { userType: true },
+        });
+        token.userType = u?.userType ?? null;
+      }
       return token;
     },
     session: ({ session, token }) => {
       if (session.user && token.id) {
         session.user.id = token.id as string;
+        (session.user as { userType?: string | null }).userType = (token.userType as string | null) ?? null;
       }
       return session;
     },

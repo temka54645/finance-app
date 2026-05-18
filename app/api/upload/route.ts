@@ -52,8 +52,18 @@ export async function POST(req: NextRequest) {
       }, { status: 422 });
     }
 
+    // Хэрэглэгчийн төрлийг авч AI category list-д ашиглана
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { userType: true },
+    });
+    const userType = (user?.userType === "business" || user?.userType === "personal")
+      ? user.userType
+      : "personal";
+
     const categorized = await categorizeTransactions(
-      parsed.map(t => ({ description: t.description, amount: t.amount }))
+      parsed.map(t => ({ description: t.description, amount: t.amount })),
+      userType
     );
 
     const finalBankName = bankNameInput || detectedBank;

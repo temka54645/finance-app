@@ -1,9 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 
-// Auth.js v5: use the `auth` export as the proxy.
-// It populates `req.auth` with the session.
-export default auth((req) => {
+export default auth(async (req) => {
   const { pathname } = req.nextUrl;
   const isLoggedIn = !!req.auth;
 
@@ -11,14 +9,33 @@ export default auth((req) => {
   const publicPaths = ["/login", "/signup", "/api/auth", "/api/health"];
   const isPublic = publicPaths.some(p => pathname.startsWith(p));
 
-  // Already logged-in user shouldn't see login/signup
+  // Logged-in user shouldn't see login/signup
   if (isLoggedIn && (pathname === "/login" || pathname === "/signup")) {
     return NextResponse.redirect(new URL("/", req.url));
   }
 
-  // Unauthenticated user accessing protected route → /login
+  // Unauthenticated → /login
   if (!isLoggedIn && !isPublic) {
     return NextResponse.redirect(new URL("/login", req.url));
+  }
+
+  // Logged in but userType not set → /onboarding
+  // (онцгой: /onboarding, /api/user, /api/auth, /api/health-ийг алгасна)
+  if (
+    isLoggedIn &&
+    !pathname.startsWith("/onboarding") &&
+    !pathname.startsWith("/api/user") &&
+    !pathname.startsWith("/api/auth") &&
+    !pathname.startsWith("/api/health") &&
+    !pathname.startsWith("/_next")
+  ) {
+    // Session-аас шууд авах боломжгүй (jwt-д userType байхгүй), тиймээс fetch шаардлагатай.
+    // Гэхдээ proxy.ts нь Edge runtime-д ажиллаж байгаа тул Prisma шууд дуудах боломжгүй.
+    // Шийдэл: jwt callback-д userType-ыг session-руу нэмж дамжуулах (доорх auth.ts засвар).
+    const userType = (req.auth?.user as { userType?: string | null } | undefined)?.userType;
+    if (!userType) {
+      return NextResponse.redirect(new URL("/onboarding", req.url));
+    }
   }
 
   return NextResponse.next();

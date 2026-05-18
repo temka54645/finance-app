@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { LogOut, User as UserIcon, ChevronDown, FileText } from "lucide-react";
+import { LogOut, User as UserIcon, ChevronDown, FileText, Tags } from "lucide-react";
 import { signOut } from "next-auth/react";
 
 interface Props {
@@ -35,6 +35,14 @@ export default function UserMenu({ email, name }: Props) {
               <p className="text-xs text-gray-400">Нэвтэрсэн</p>
               <p className="text-sm font-medium text-gray-800 truncate">{email}</p>
             </div>
+            <Link
+              href="/categories"
+              onClick={() => setOpen(false)}
+              className="w-full px-3 py-2 text-sm text-left text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+            >
+              <Tags className="w-4 h-4 text-gray-400" />
+              Ангиллын каталог
+            </Link>
             <Link
               href="/statements"
               onClick={() => setOpen(false)}

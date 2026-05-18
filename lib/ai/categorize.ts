@@ -1,4 +1,9 @@
 import Anthropic from "@anthropic-ai/sdk";
+import {
+  getIncomeCategoryNames,
+  getExpenseCategoryNames,
+  type UserType,
+} from "@/lib/categories";
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
@@ -12,13 +17,15 @@ export interface CategorizationResult {
   category: string;
 }
 
-export const INCOME_CATEGORIES = ["Цалин", "Шилжүүлэг хүлээн авсан", "Буцаалт", "Хүү", "Бусад орлого"];
-export const EXPENSE_CATEGORIES = ["Банкны шимтгэл", "Цалин зарлага", "Хоол & Ресторан", "Тээвэр", "Худалдаа", "Коммунал", "Эрүүл мэнд", "Боловсрол", "Цэвэрлэгээ & Засвар", "Татвар", "Бусад зарлага"];
+// Backward-compat экспорт (хуучин компонентууд import хийсэн байж болзошгүй)
+export const INCOME_CATEGORIES = getIncomeCategoryNames("personal");
+export const EXPENSE_CATEGORIES = getExpenseCategoryNames("personal");
 
-// Тогтсон keyword-уудаас түрүүлж шууд таних (AI-ас илүү найдвартай)
+// Тогтсон keyword-уудаас түрүүлж шууд таних (AI-ас илүү найдвартай).
+// Эдгээр нь хоёулангаас (personal болон business) -д хамаатай universal rules.
 const KEYWORD_RULES: Array<{ pattern: RegExp; type: "income" | "expense"; category: string }> = [
   { pattern: /шимтгэл|комисс|service\s*fee|bank\s*fee|шил.+гээний\s*шимтгэл/i, type: "expense", category: "Банкны шимтгэл" },
-  { pattern: /цалин|tsalin|salary|payroll|tsali?n/i, type: "expense", category: "Цалин зарлага" },
+  { pattern: /цалин|tsalin|salary|payroll/i, type: "expense", category: "Цалин зарлага" },
   { pattern: /татвар|tatvar|tax|нийгмийн.*даатгал/i, type: "expense", category: "Татвар" },
 ];
 
@@ -31,30 +38,37 @@ function matchKeyword(description: string, type: "income" | "expense"): string |
   return null;
 }
 
-function fallback(transactions: TransactionInput[]): CategorizationResult[] {
+function fallback(
+  transactions: TransactionInput[],
+  fallbackIncomeCategory: string,
+  fallbackExpenseCategory: string
+): CategorizationResult[] {
   const incomeKeywords = /цалин|орлого|хүлээн|буцаалт|хүү|deposit|credit|salary|income|зээл олголт/i;
   const expenseKeywords = /төлөлт|зардал|худалдан|авалт|хоол|тээвэр|коммунал|татвар|шимтгэл|payment|purchase|withdraw|debit/i;
 
   return transactions.map(t => {
     if (incomeKeywords.test(t.description)) {
-      return { type: "income", category: "Бусад орлого" };
+      return { type: "income", category: fallbackIncomeCategory };
     }
     if (expenseKeywords.test(t.description)) {
-      return { type: "expense", category: "Бусад зарлага" };
+      return { type: "expense", category: fallbackExpenseCategory };
     }
-    // amount дохио: хэрэв тодорхой байвал ашигла
     return {
-      type: t.amount < 0 ? "income" : "expense",  // bank statement: credit=орлого(+), debit=зарлага(-)
-      category: t.amount < 0 ? "Бусад орлого" : "Бусад зарлага",
+      type: t.amount < 0 ? "income" : "expense",
+      category: t.amount < 0 ? fallbackIncomeCategory : fallbackExpenseCategory,
     };
   });
 }
 
-async function categorizeBatch(batch: TransactionInput[]): Promise<CategorizationResult[]> {
+async function categorizeBatch(
+  batch: TransactionInput[],
+  incomeCats: string[],
+  expenseCats: string[]
+): Promise<CategorizationResult[]> {
   const prompt = `Монгол банкны гүйлгээний категори тодорхойл. Эерэг дүн = орлого, сөрөг дүн = зарлага (энэ нь parser-аас тогтоогдсон, өөрчилж болохгүй).
 
-Орлогын категори: ${INCOME_CATEGORIES.join(", ")}
-Зарлагын категори: ${EXPENSE_CATEGORIES.join(", ")}
+Орлогын категори: ${incomeCats.join(", ")}
+Зарлагын категори: ${expenseCats.join(", ")}
 
 Гүйлгээнүүд:
 ${JSON.stringify(batch.map((t, i) => ({ i, desc: t.description, amount: t.amount })))}
@@ -65,9 +79,8 @@ ${JSON.stringify(batch.map((t, i) => ({ i, desc: t.description, amount: t.amount
 - Тайлбараас хамгийн тохиромжтой категори сонг
 
 Зөвхөн JSON массив буцаа:
-[{"type":"income","category":"Цалин"},{"type":"expense","category":"Хоол & Ресторан"}]`;
+[{"type":"income","category":"Цалин"},{"type":"expense","category":"Хоол, ресторан"}]`;
 
-  // 30 секундын timeout
   const response = await Promise.race([
     client.messages.create({
       model: "claude-haiku-4-5-20251001",
@@ -89,18 +102,24 @@ ${JSON.stringify(batch.map((t, i) => ({ i, desc: t.description, amount: t.amount
 }
 
 export async function categorizeTransactions(
-  transactions: TransactionInput[]
+  transactions: TransactionInput[],
+  userType: UserType = "personal"
 ): Promise<CategorizationResult[]> {
   if (transactions.length === 0) return [];
 
-  // Эхлээд keyword-аар таних — танигдсаныг AI-руу явуулахгүй
+  const incomeCats = getIncomeCategoryNames(userType);
+  const expenseCats = getExpenseCategoryNames(userType);
+
+  const fallbackIncome = userType === "business" ? "Бусад орлого" : "Бусад орлого";
+  const fallbackExpense = userType === "business" ? "Бусад зарлага" : "Бусад зарлага";
+
+  // Keyword дүрмээр түрүүлж шалгана
   const results: (CategorizationResult | null)[] = transactions.map(t => {
     const type: "income" | "expense" = t.amount >= 0 ? "income" : "expense";
     const matched = matchKeyword(t.description, type);
     return matched ? { type, category: matched } : null;
   });
 
-  // AI-руу зөвхөн танигдаагүйг илгээх
   const aiNeededIdx: number[] = results
     .map((r, i) => r === null ? i : -1)
     .filter(i => i >= 0);
@@ -116,16 +135,15 @@ export async function categorizeTransactions(
   for (let i = 0; i < aiInputs.length; i += BATCH_SIZE) {
     const batch = aiInputs.slice(i, i + BATCH_SIZE);
     try {
-      aiResults.push(...await categorizeBatch(batch));
+      aiResults.push(...await categorizeBatch(batch, incomeCats, expenseCats));
     } catch (err) {
       console.error(`AI batch ${i}-${i + BATCH_SIZE} failed:`, err);
-      aiResults.push(...fallback(batch));
+      aiResults.push(...fallback(batch, fallbackIncome, fallbackExpense));
     }
   }
 
-  // Үр дүнг нэгтгэх
   aiNeededIdx.forEach((origIdx, i) => {
-    results[origIdx] = aiResults[i] ?? fallback([transactions[origIdx]])[0];
+    results[origIdx] = aiResults[i] ?? fallback([transactions[origIdx]], fallbackIncome, fallbackExpense)[0];
   });
 
   return results as CategorizationResult[];
