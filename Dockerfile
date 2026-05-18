@@ -42,5 +42,7 @@ COPY --from=builder --chown=nextjs:nodejs /app/prisma.config.ts ./prisma.config.
 USER nextjs
 EXPOSE 3000
 
-# Migrate-ийг хийгээд server.js (Next.js standalone) ажиллуулна
-CMD ["sh","-c","npx prisma migrate deploy && node server.js"]
+# Migrate-ийг хийгээд server.js (Next.js standalone) ажиллуулна.
+# `node node_modules/prisma/build/index.js` — npx-гүйгээр шууд CLI дуудаж байна
+# (standalone build-д .bin shim байхгүй).
+CMD ["sh","-c","node node_modules/prisma/build/index.js migrate deploy && node server.js"]
