@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { BarChart2, Loader2 } from "lucide-react";
 import { signupAction } from "../actions";
+import GoogleSignInButton from "@/components/GoogleSignInButton";
 
 export default function SignupPage() {
   const router = useRouter();
@@ -98,6 +99,14 @@ export default function SignupPage() {
           Бүртгүүлэх
         </button>
       </form>
+
+      <div className="flex items-center gap-3 my-4">
+        <div className="flex-1 h-px bg-gray-200" />
+        <span className="text-xs text-gray-400">эсвэл</span>
+        <div className="flex-1 h-px bg-gray-200" />
+      </div>
+
+      <GoogleSignInButton label="Google-ээр бүртгүүлэх" />
 
       <p className="text-sm text-center text-gray-500 mt-4">
         Аль хэдийн бүртгэлтэй юу?{" "}
