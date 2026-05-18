@@ -18,19 +18,19 @@ RUN npx prisma generate
 ENV NEXT_TELEMETRY_DISABLED=1
 RUN npm run build
 
-# ── 3. migrate-deps (Prisma CLI-н бүх transitive deps-тэй цэвэр install) ────
-FROM node:20-alpine AS migrate-deps
+# ── 3. prod-deps (зөвхөн production deps, dev устгасан) ──────────
+FROM node:20-alpine AS prod-deps
 WORKDIR /app
 RUN apk add --no-cache libc6-compat
 COPY package*.json ./
 COPY prisma ./prisma
 COPY prisma.config.ts ./
-# Зөвхөн prisma migration ажиллуулахад хэрэгцээтэй deps:
-RUN npm install --omit=optional --no-audit --no-fund prisma @prisma/client @prisma/adapter-pg pg dotenv
+RUN npm ci --omit=dev
 
 # ── 4. runner ────────────────────────────────────────────────────
 FROM node:20-alpine AS runner
 WORKDIR /app
+RUN apk add --no-cache libc6-compat
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV PORT=3000
@@ -39,21 +39,23 @@ ENV HOSTNAME=0.0.0.0
 RUN addgroup --system --gid 1001 nodejs \
  && adduser --system --uid 1001 nextjs
 
-# Next.js standalone (өөрөө node_modules-ын subset-тэй)
+# Бүх production deps (Prisma CLI болон бүх transitive deps оруулсан)
+COPY --from=prod-deps --chown=nextjs:nodejs /app/node_modules ./node_modules
+COPY --from=prod-deps --chown=nextjs:nodejs /app/package.json ./package.json
+COPY --from=prod-deps --chown=nextjs:nodejs /app/prisma ./prisma
+COPY --from=prod-deps --chown=nextjs:nodejs /app/prisma.config.ts ./prisma.config.ts
+
+# Generated Prisma client (Prisma 7-н output)
+COPY --from=builder --chown=nextjs:nodejs /app/app/generated ./app/generated
+
+# Next.js standalone build (server.js + .next/server + минимал node_modules)
+# ⚠ Энэ нь node_modules-ийг overlay хийнэ — standalone-н Next.js модулиуд prod-deps-ийг override болгоно
 COPY --from=builder /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
-COPY --from=builder --chown=nextjs:nodejs /app/app/generated ./app/generated
-
-# Migration ажиллуулахад хэрэгтэй prisma CLI + бүх transitive deps
-COPY --from=migrate-deps --chown=nextjs:nodejs /app/node_modules ./prisma-cli-modules
-COPY --from=builder --chown=nextjs:nodejs /app/prisma ./prisma
-COPY --from=builder --chown=nextjs:nodejs /app/prisma.config.ts ./prisma.config.ts
-COPY --from=builder --chown=nextjs:nodejs /app/package.json ./package.json
 
 USER nextjs
 EXPOSE 3000
 
-# Migrate-ийн node_modules-ыг түр зам дээр зааж, migrate deploy ажиллуулна.
-# Дараа нь Next.js standalone server.js ажиллана (өөрийн node_modules-той).
-CMD ["sh","-c","NODE_PATH=/app/prisma-cli-modules node /app/prisma-cli-modules/prisma/build/index.js migrate deploy && node server.js"]
+# `node_modules/.bin/prisma` нь npm install-аас shim үүсгэгдсэн тул шууд хэрэглэнэ
+CMD ["sh","-c","./node_modules/.bin/prisma migrate deploy && node server.js"]
