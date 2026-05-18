@@ -2,20 +2,16 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useSession } from "next-auth/react";
-import { BarChart2, ChevronDown, RefreshCw } from "lucide-react";
+import { BarChart2, RefreshCw, Upload, X } from "lucide-react";
 import FileUpload from "@/components/FileUpload";
-import SummaryCards from "@/components/SummaryCards";
 import HighlightCards from "@/components/HighlightCards";
 import UncategorizedSection from "@/components/UncategorizedSection";
-import TransactionTable from "@/components/TransactionTable";
-import YearSelector from "@/components/YearSelector";
-import MonthlyChart from "@/components/MonthlyChart";
+import YearTimeline from "@/components/YearTimeline";
 import UserMenu from "@/components/UserMenu";
 
 interface Highlight { amount: number; count: number }
-interface MonthlyDatum { month: number; income: number; expense: number }
 
-interface Report {
+interface OverviewReport {
   totalIncome: number;
   totalExpense: number;
   balance: number;
@@ -28,69 +24,49 @@ interface Report {
     salaryReceived: Highlight;
   };
   uncategorizedCount: number;
-  byCategory: { category: string; type: string; _sum: { amount: number }; _count: number }[];
-  statements: { id: string; fileName: string; bankName?: string; uploadedAt: string }[];
-  availableYears: number[];
-  year: number | null;
-  monthly: MonthlyDatum[];
 }
 
-interface Transaction {
-  id: string;
-  date: string;
-  description: string;
-  amount: number;
-  type: string;
-  category: string;
-  note?: string | null;
-  statement?: { fileName: string; bankName?: string | null };
+function fmt(n: number) {
+  return n.toLocaleString("mn-MN", { maximumFractionDigits: 0 }) + "₮";
 }
 
 export default function Home() {
   const { data: session } = useSession();
-  const [report, setReport] = useState<Report | null>(null);
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [selectedStatement, setSelectedStatement] = useState<string>("");
-  const [year, setYear] = useState<number>(new Date().getFullYear());
-  const [activeTab, setActiveTab] = useState<"upload" | "transactions" | "report">("upload");
+  const [overview, setOverview] = useState<OverviewReport | null>(null);
   const [loading, setLoading] = useState(false);
+  const [uploadModalOpen, setUploadModalOpen] = useState(false);
 
-  const fetchData = useCallback(async () => {
+  const fetchOverview = useCallback(async () => {
     setLoading(true);
     try {
-      const params = new URLSearchParams({ year: String(year) });
-      if (selectedStatement) params.set("statementId", selectedStatement);
-
-      const [reportRes, txRes] = await Promise.all([
-        fetch(`/api/reports?${params}`),
-        fetch(`/api/transactions?${params}`),
-      ]);
-      const [reportData, txData] = await Promise.all([reportRes.json(), txRes.json()]);
-      setReport(reportData);
-      setTransactions(txData.transactions ?? []);
+      // year-гүй → all-time
+      const res = await fetch("/api/reports");
+      const data = await res.json();
+      setOverview(data);
     } finally {
       setLoading(false);
     }
-  }, [selectedStatement, year]);
+  }, []);
 
-  useEffect(() => { fetchData(); }, [fetchData]);
+  useEffect(() => { fetchOverview(); }, [fetchOverview]);
 
-  // Хэрэглэгчид өгөгдөл байгаа бол хамгийн сүүлийн жилийг автоматаар сонгох
+  // ESC дарж upload modal-ийг хаах
   useEffect(() => {
-    if (report?.availableYears && report.availableYears.length > 0
-        && !report.availableYears.includes(year)) {
-      setYear(report.availableYears[0]);
-    }
-  }, [report?.availableYears, year]);
+    if (!uploadModalOpen) return;
+    const onEsc = (e: KeyboardEvent) => e.key === "Escape" && setUploadModalOpen(false);
+    document.addEventListener("keydown", onEsc);
+    return () => document.removeEventListener("keydown", onEsc);
+  }, [uploadModalOpen]);
 
   const handleUploadSuccess = () => {
-    fetchData();
-    setActiveTab("transactions");
+    setUploadModalOpen(false);
+    fetchOverview();
+    // YearTimeline дотроосоо refetch хийнэ (onChange→handleRefetch)
   };
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <header className="bg-white border-b border-gray-200 px-6 py-4">
+      <header className="bg-white border-b border-gray-200 px-6 py-4 sticky top-0 z-30">
         <div className="max-w-6xl mx-auto flex items-center justify-between gap-4">
           <div className="flex items-center gap-3 min-w-0">
             <div className="w-9 h-9 bg-blue-600 rounded-lg flex items-center justify-center flex-shrink-0">
@@ -103,7 +79,14 @@ export default function Home() {
           </div>
           <div className="flex items-center gap-2">
             <button
-              onClick={fetchData}
+              onClick={() => setUploadModalOpen(true)}
+              className="inline-flex items-center gap-2 bg-blue-600 text-white px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
+            >
+              <Upload className="w-4 h-4" />
+              <span className="hidden sm:inline">Файл оруулах</span>
+            </button>
+            <button
+              onClick={fetchOverview}
               disabled={loading}
               className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
               title="Шинэчлэх"
@@ -121,124 +104,80 @@ export default function Home() {
       </header>
 
       <main className="max-w-6xl mx-auto px-6 py-6 space-y-6">
-        {/* Жил сонгох + statement шүүх */}
-        <div className="flex flex-wrap items-center gap-4">
-          <YearSelector
-            year={year}
-            availableYears={report?.availableYears ?? []}
-            onChange={setYear}
-          />
-          {report?.statements && report.statements.length > 0 && (
-            <div className="flex items-center gap-2">
-              <label className="text-sm text-gray-600 font-medium whitespace-nowrap">Хуулга:</label>
-              <div className="relative">
-                <select
-                  value={selectedStatement}
-                  onChange={e => setSelectedStatement(e.target.value)}
-                  className="pl-3 pr-8 py-1.5 border rounded-lg text-sm appearance-none focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
-                >
-                  <option value="">Бүгд</option>
-                  {report.statements.map(s => (
-                    <option key={s.id} value={s.id}>
-                      {s.bankName ? `${s.bankName} — ` : ""}{s.fileName}
-                    </option>
-                  ))}
-                </select>
-                <ChevronDown className="absolute right-2 top-2 w-4 h-4 text-gray-400 pointer-events-none" />
-              </div>
+        {/* Overall summary stat strip */}
+        {overview && overview.incomeCount + overview.expenseCount > 0 && (
+          <div className="grid grid-cols-3 gap-3">
+            <div className="bg-white border border-green-200 rounded-xl px-4 py-3">
+              <p className="text-[10px] uppercase text-green-700 font-semibold">Нийт орлого</p>
+              <p className="text-lg font-bold text-green-700 tabular-nums">+{fmt(overview.totalIncome)}</p>
+              <p className="text-[10px] text-green-600/70 mt-0.5">{overview.incomeCount} гүйлгээ</p>
             </div>
-          )}
-        </div>
-
-        {report && (
-          <>
-            <SummaryCards
-              totalIncome={report.totalIncome}
-              totalExpense={report.totalExpense}
-              balance={report.balance}
-              incomeCount={report.incomeCount}
-              expenseCount={report.expenseCount}
-            />
-            {report.highlights && (
-              <HighlightCards
-                bankFees={report.highlights.bankFees}
-                salaryPaid={report.highlights.salaryPaid}
-                taxes={report.highlights.taxes}
-                salaryReceived={report.highlights.salaryReceived}
-              />
-            )}
-            {report.monthly && report.monthly.length > 0 && (
-              <MonthlyChart year={year} monthly={report.monthly} />
-            )}
-            {report.uncategorizedCount > 0 && (
-              <UncategorizedSection
-                statementId={selectedStatement}
-                count={report.uncategorizedCount}
-                onUpdate={fetchData}
-              />
-            )}
-          </>
+            <div className="bg-white border border-red-200 rounded-xl px-4 py-3">
+              <p className="text-[10px] uppercase text-red-700 font-semibold">Нийт зарлага</p>
+              <p className="text-lg font-bold text-red-700 tabular-nums">−{fmt(overview.totalExpense)}</p>
+              <p className="text-[10px] text-red-600/70 mt-0.5">{overview.expenseCount} гүйлгээ</p>
+            </div>
+            <div className={`bg-white border rounded-xl px-4 py-3 ${
+              overview.balance >= 0 ? "border-blue-200" : "border-orange-200"
+            }`}>
+              <p className={`text-[10px] uppercase font-semibold ${
+                overview.balance >= 0 ? "text-blue-700" : "text-orange-700"
+              }`}>Үлдэгдэл</p>
+              <p className={`text-lg font-bold tabular-nums ${
+                overview.balance >= 0 ? "text-blue-700" : "text-orange-700"
+              }`}>{overview.balance >= 0 ? "+" : ""}{fmt(overview.balance)}</p>
+              <p className={`text-[10px] mt-0.5 ${
+                overview.balance >= 0 ? "text-blue-600/70" : "text-orange-600/70"
+              }`}>{overview.balance >= 0 ? "Ашигтай" : "Алдагдалтай"}</p>
+            </div>
+          </div>
         )}
 
-        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-          <div className="flex border-b border-gray-200">
-            {(["upload", "transactions", "report"] as const).map(tab => (
-              <button
-                key={tab}
-                onClick={() => setActiveTab(tab)}
-                className={`flex-1 px-4 py-3 text-sm font-medium transition-colors ${
-                  activeTab === tab
-                    ? "text-blue-600 border-b-2 border-blue-600 bg-blue-50"
-                    : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"
-                }`}
-              >
-                {tab === "upload" ? "📁 Файл оруулах" : tab === "transactions" ? "📋 Гүйлгээнүүд" : "📊 Тайлан"}
-              </button>
-            ))}
-          </div>
+        {overview?.highlights && overview.incomeCount + overview.expenseCount > 0 && (
+          <HighlightCards
+            bankFees={overview.highlights.bankFees}
+            salaryPaid={overview.highlights.salaryPaid}
+            taxes={overview.highlights.taxes}
+            salaryReceived={overview.highlights.salaryReceived}
+          />
+        )}
 
-          <div className="p-6">
-            {activeTab === "upload" && (
-              <FileUpload onSuccess={handleUploadSuccess} />
-            )}
+        {overview && overview.uncategorizedCount > 0 && (
+          <UncategorizedSection
+            statementId=""
+            count={overview.uncategorizedCount}
+            onUpdate={fetchOverview}
+          />
+        )}
 
-            {activeTab === "transactions" && (
-              <TransactionTable transactions={transactions} onUpdate={fetchData} />
-            )}
-
-            {activeTab === "report" && report && (
-              <div className="space-y-4">
-                <h3 className="font-semibold text-gray-800">Категориор хуваарилалт</h3>
-                {report.byCategory.length === 0 ? (
-                  <p className="text-gray-400 text-sm">Мэдээлэл байхгүй байна</p>
-                ) : (
-                  <div className="space-y-2">
-                    {report.byCategory
-                      .sort((a, b) => b._sum.amount - a._sum.amount)
-                      .map((item, i) => (
-                        <div key={i} className="flex items-center justify-between py-2 border-b border-gray-100 last:border-0">
-                          <div className="flex items-center gap-3">
-                            <span className={`w-2 h-2 rounded-full ${item.type === "income" ? "bg-green-500" : "bg-red-500"}`} />
-                            <span className="text-sm text-gray-700">{item.category}</span>
-                            <span className={`text-xs px-1.5 py-0.5 rounded ${item.type === "income" ? "bg-green-100 text-green-600" : "bg-red-100 text-red-600"}`}>
-                              {item.type === "income" ? "Орлого" : "Зарлага"}
-                            </span>
-                          </div>
-                          <div className="text-right">
-                            <p className={`font-medium text-sm ${item.type === "income" ? "text-green-600" : "text-red-600"}`}>
-                              {item._sum.amount.toLocaleString("mn-MN")}₮
-                            </p>
-                            <p className="text-xs text-gray-400">{item._count} гүйлгээ</p>
-                          </div>
-                        </div>
-                      ))}
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        </div>
+        {/* Гол YearTimeline */}
+        <YearTimeline onChange={fetchOverview} />
       </main>
+
+      {/* Global upload modal */}
+      {uploadModalOpen && (
+        <>
+          <div
+            onClick={() => setUploadModalOpen(false)}
+            className="fixed inset-0 bg-black/40 z-40"
+          />
+          <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-md bg-white rounded-xl shadow-2xl z-50 p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-bold text-gray-900">Файл оруулах</h2>
+              <button
+                onClick={() => setUploadModalOpen(false)}
+                className="text-gray-400 hover:text-gray-700"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <p className="text-xs text-gray-500 mb-4">
+              PDF, Excel (.xlsx) эсвэл CSV формат дэмжигдэнэ. Файл доторх гүйлгээ нь огнооны дагуу зөв сард байршина.
+            </p>
+            <FileUpload onSuccess={handleUploadSuccess} />
+          </div>
+        </>
+      )}
     </div>
   );
 }

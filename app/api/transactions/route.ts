@@ -11,6 +11,13 @@ function yearRange(year: number) {
   };
 }
 
+function monthRange(year: number, month: number) {
+  return {
+    gte: new Date(Date.UTC(year, month - 1, 1)),
+    lt:  new Date(Date.UTC(year, month, 1)),
+  };
+}
+
 export async function GET(req: NextRequest) {
   try {
     const userId = await requireUserId();
@@ -19,14 +26,20 @@ export async function GET(req: NextRequest) {
     const uncategorized = searchParams.get("uncategorized") === "true";
     const yearParam = searchParams.get("year");
     const year = yearParam ? Number(yearParam) : null;
+    const monthParam = searchParams.get("month");
+    const month = monthParam ? Number(monthParam) : null;
 
     const where: Record<string, unknown> = {
-      // bury tenant scope via the statement relation
+      // tenant scope via the statement relation
       statement: { userId },
     };
     if (statementId) where.statementId = statementId;
     if (uncategorized) where.category = { in: UNCATEGORIZED };
-    if (year && !isNaN(year)) where.date = yearRange(year);
+    if (year && !isNaN(year) && month && !isNaN(month) && month >= 1 && month <= 12) {
+      where.date = monthRange(year, month);
+    } else if (year && !isNaN(year)) {
+      where.date = yearRange(year);
+    }
 
     const transactions = await prisma.transaction.findMany({
       where,

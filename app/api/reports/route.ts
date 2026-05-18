@@ -11,6 +11,13 @@ function yearRange(year: number) {
   };
 }
 
+function monthRange(year: number, month: number) {
+  return {
+    gte: new Date(Date.UTC(year, month - 1, 1)),
+    lt:  new Date(Date.UTC(year, month, 1)),
+  };
+}
+
 interface MonthlyRow {
   month: number;
   type: string;
@@ -24,12 +31,18 @@ export async function GET(req: NextRequest) {
     const statementId = searchParams.get("statementId");
     const yearParam = searchParams.get("year");
     const year = yearParam ? Number(yearParam) : null;
+    const monthParam = searchParams.get("month");
+    const month = monthParam ? Number(monthParam) : null;
 
     const where: Record<string, unknown> = {
       statement: { userId },
     };
     if (statementId) where.statementId = statementId;
-    if (year && !isNaN(year)) where.date = yearRange(year);
+    if (year && !isNaN(year) && month && !isNaN(month) && month >= 1 && month <= 12) {
+      where.date = monthRange(year, month);
+    } else if (year && !isNaN(year)) {
+      where.date = yearRange(year);
+    }
 
     const [incomeAgg, expenseAgg, byCategory, statements, uncategorizedCount, availableYearsRaw] = await Promise.all([
       prisma.transaction.aggregate({ where: { ...where, type: "income" }, _sum: { amount: true }, _count: true }),
@@ -67,9 +80,9 @@ export async function GET(req: NextRequest) {
 
     const availableYears = availableYearsRaw.map(r => r.year);
 
-    // Сарын aggregation (зөвхөн жил сонгосон үед)
+    // Сарын aggregation (зөвхөн жил сонгосон, сар сонгоогүй үед)
     let monthly: { month: number; income: number; expense: number }[] = [];
-    if (year && !isNaN(year)) {
+    if (year && !isNaN(year) && !month) {
       const baseFilter = statementId ? `AND t."statementId" = $3` : ``;
       const params: unknown[] = [userId, year];
       if (statementId) params.push(statementId);
