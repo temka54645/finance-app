@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useSession } from "next-auth/react";
 import { BarChart2, RefreshCw, Upload, X } from "lucide-react";
 import FileUpload from "@/components/FileUpload";
+import SummaryCards from "@/components/SummaryCards";
 import HighlightCards from "@/components/HighlightCards";
 import UncategorizedSection from "@/components/UncategorizedSection";
 import YearTimeline from "@/components/YearTimeline";
@@ -26,10 +27,6 @@ interface OverviewReport {
   uncategorizedCount: number;
 }
 
-function fmt(n: number) {
-  return n.toLocaleString("mn-MN", { maximumFractionDigits: 0 }) + "₮";
-}
-
 export default function Home() {
   const { data: session } = useSession();
   const [overview, setOverview] = useState<OverviewReport | null>(null);
@@ -39,7 +36,6 @@ export default function Home() {
   const fetchOverview = useCallback(async () => {
     setLoading(true);
     try {
-      // year-гүй → all-time
       const res = await fetch("/api/reports");
       const data = await res.json();
       setOverview(data);
@@ -50,7 +46,6 @@ export default function Home() {
 
   useEffect(() => { fetchOverview(); }, [fetchOverview]);
 
-  // ESC дарж upload modal-ийг хаах
   useEffect(() => {
     if (!uploadModalOpen) return;
     const onEsc = (e: KeyboardEvent) => e.key === "Escape" && setUploadModalOpen(false);
@@ -61,37 +56,50 @@ export default function Home() {
   const handleUploadSuccess = () => {
     setUploadModalOpen(false);
     fetchOverview();
-    // YearTimeline дотроосоо refetch хийнэ (onChange→handleRefetch)
   };
 
+  const displayName = session?.user?.name || session?.user?.email?.split("@")[0] || "хэрэглэгч";
+  const hasData = overview && overview.incomeCount + overview.expenseCount > 0;
+
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-white border-b border-gray-200 px-6 py-4 sticky top-0 z-30">
-        <div className="max-w-6xl mx-auto flex items-center justify-between gap-4">
+    <div className="relative min-h-screen overflow-hidden bg-slate-50 text-slate-900">
+      {/* Ambient background */}
+      <div className="pointer-events-none absolute inset-0">
+        <div className="absolute -top-40 left-1/3 h-[28rem] w-[28rem] rounded-full bg-blue-300/30 blur-3xl" />
+        <div className="absolute top-1/2 -right-32 h-[28rem] w-[28rem] rounded-full bg-indigo-300/30 blur-3xl" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(15,23,42,0.04)_1px,transparent_1px)] [background-size:28px_28px]" />
+      </div>
+
+      {/* Header */}
+      <header className="relative z-20 border-b border-slate-200 bg-white/80 backdrop-blur-xl sticky top-0">
+        <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-6 py-4">
           <div className="flex items-center gap-3 min-w-0">
-            <div className="w-9 h-9 bg-blue-600 rounded-lg flex items-center justify-center flex-shrink-0">
-              <BarChart2 className="w-5 h-5 text-white" />
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 shadow-lg shadow-blue-500/30 flex-shrink-0">
+              <BarChart2 className="h-5 w-5 text-white" />
             </div>
             <div className="min-w-0">
-              <h1 className="text-lg font-bold text-gray-900 truncate">Санхүүгийн дүн шинжилгээ</h1>
-              <p className="text-xs text-gray-500 truncate">Банкны хуулга задлан шинжилгээ</p>
+              <h1 className="text-base font-semibold tracking-tight text-slate-900 truncate">
+                Finance Analytics
+              </h1>
+              <p className="text-xs text-slate-500 truncate">Банкны хуулга задлан шинжилгээ</p>
             </div>
           </div>
+
           <div className="flex items-center gap-2">
-            <button
-              onClick={() => setUploadModalOpen(true)}
-              className="inline-flex items-center gap-2 bg-blue-600 text-white px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
-            >
-              <Upload className="w-4 h-4" />
-              <span className="hidden sm:inline">Файл оруулах</span>
-            </button>
             <button
               onClick={fetchOverview}
               disabled={loading}
-              className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+              className="rounded-lg p-2 text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700"
               title="Шинэчлэх"
             >
-              <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
+              <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+            </button>
+            <button
+              onClick={() => setUploadModalOpen(true)}
+              className="inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-blue-500 to-indigo-600 px-3.5 py-2 text-sm font-semibold text-white shadow-lg shadow-blue-500/30 transition-all hover:brightness-110"
+            >
+              <Upload className="h-4 w-4" />
+              <span className="hidden sm:inline">Файл оруулах</span>
             </button>
             {session?.user && (
               <UserMenu
@@ -103,37 +111,32 @@ export default function Home() {
         </div>
       </header>
 
-      <main className="max-w-6xl mx-auto px-6 py-6 space-y-6">
-        {/* Overall summary stat strip */}
-        {overview && overview.incomeCount + overview.expenseCount > 0 && (
-          <div className="grid grid-cols-3 gap-3">
-            <div className="bg-white border border-green-200 rounded-xl px-4 py-3">
-              <p className="text-[10px] uppercase text-green-700 font-semibold">Нийт орлого</p>
-              <p className="text-lg font-bold text-green-700 tabular-nums">+{fmt(overview.totalIncome)}</p>
-              <p className="text-[10px] text-green-600/70 mt-0.5">{overview.incomeCount} гүйлгээ</p>
-            </div>
-            <div className="bg-white border border-red-200 rounded-xl px-4 py-3">
-              <p className="text-[10px] uppercase text-red-700 font-semibold">Нийт зарлага</p>
-              <p className="text-lg font-bold text-red-700 tabular-nums">−{fmt(overview.totalExpense)}</p>
-              <p className="text-[10px] text-red-600/70 mt-0.5">{overview.expenseCount} гүйлгээ</p>
-            </div>
-            <div className={`bg-white border rounded-xl px-4 py-3 ${
-              overview.balance >= 0 ? "border-blue-200" : "border-orange-200"
-            }`}>
-              <p className={`text-[10px] uppercase font-semibold ${
-                overview.balance >= 0 ? "text-blue-700" : "text-orange-700"
-              }`}>Үлдэгдэл</p>
-              <p className={`text-lg font-bold tabular-nums ${
-                overview.balance >= 0 ? "text-blue-700" : "text-orange-700"
-              }`}>{overview.balance >= 0 ? "+" : ""}{fmt(overview.balance)}</p>
-              <p className={`text-[10px] mt-0.5 ${
-                overview.balance >= 0 ? "text-blue-600/70" : "text-orange-600/70"
-              }`}>{overview.balance >= 0 ? "Ашигтай" : "Алдагдалтай"}</p>
-            </div>
-          </div>
+      <main className="relative z-10 mx-auto max-w-7xl space-y-8 px-6 py-8">
+        {/* Greeting */}
+        <div>
+          <p className="text-xs uppercase tracking-wider text-slate-400">Тойм</p>
+          <h2 className="mt-1 text-2xl font-semibold tracking-tight text-slate-900 sm:text-3xl">
+            Сайн байна уу,{" "}
+            <span className="bg-gradient-to-r from-blue-600 to-indigo-500 bg-clip-text text-transparent">
+              {displayName}
+            </span>
+          </h2>
+          <p className="mt-1 text-sm text-slate-500">Нийт нэгтгэсэн дүн шинжилгээ</p>
+        </div>
+
+        {/* Summary cards */}
+        {hasData && overview && (
+          <SummaryCards
+            totalIncome={overview.totalIncome}
+            totalExpense={overview.totalExpense}
+            balance={overview.balance}
+            incomeCount={overview.incomeCount}
+            expenseCount={overview.expenseCount}
+          />
         )}
 
-        {overview?.highlights && overview.incomeCount + overview.expenseCount > 0 && (
+        {/* Highlight cards */}
+        {hasData && overview?.highlights && (
           <HighlightCards
             bankFees={overview.highlights.bankFees}
             salaryPaid={overview.highlights.salaryPaid}
@@ -142,6 +145,7 @@ export default function Home() {
           />
         )}
 
+        {/* Uncategorized alert */}
         {overview && overview.uncategorizedCount > 0 && (
           <UncategorizedSection
             statementId=""
@@ -150,8 +154,18 @@ export default function Home() {
           />
         )}
 
-        {/* Гол YearTimeline */}
-        <YearTimeline onChange={fetchOverview} />
+        {/* Year-by-year timeline */}
+        <section>
+          <div className="mb-4">
+            <h3 className="text-sm font-semibold uppercase tracking-wider text-slate-700">
+              Жил тус бүрийн задаргаа
+            </h3>
+            <p className="mt-1 text-xs text-slate-500">
+              Жилийн мөр дээр дарж сар тус бүрийн дүнг нээх боломжтой
+            </p>
+          </div>
+          <YearTimeline onChange={fetchOverview} />
+        </section>
       </main>
 
       {/* Global upload modal */}
@@ -159,19 +173,20 @@ export default function Home() {
         <>
           <div
             onClick={() => setUploadModalOpen(false)}
-            className="fixed inset-0 bg-black/40 z-40"
+            className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-40"
           />
-          <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-md bg-white rounded-xl shadow-2xl z-50 p-6">
+          <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-md bg-white rounded-2xl shadow-2xl shadow-slate-300/40 z-50 p-6 border border-slate-200">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-bold text-gray-900">Файл оруулах</h2>
+              <h2 className="text-lg font-semibold tracking-tight text-slate-900">Файл оруулах</h2>
               <button
                 onClick={() => setUploadModalOpen(false)}
-                className="text-gray-400 hover:text-gray-700"
+                className="text-slate-400 hover:text-slate-700 transition-colors"
+                aria-label="Хаах"
               >
-                <X className="w-5 h-5" />
+                <X className="h-5 w-5" />
               </button>
             </div>
-            <p className="text-xs text-gray-500 mb-4">
+            <p className="text-xs text-slate-500 mb-4">
               PDF, Excel (.xlsx) эсвэл CSV формат дэмжигдэнэ. Файл доторх гүйлгээ нь огнооны дагуу зөв сард байршина.
             </p>
             <FileUpload onSuccess={handleUploadSuccess} />

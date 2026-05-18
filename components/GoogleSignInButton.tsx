@@ -2,12 +2,16 @@
 
 import { signIn } from "next-auth/react";
 
-export default function GoogleSignInButton({ label = "Google-ээр үргэлжлүүлэх" }: { label?: string }) {
+export default function GoogleSignInButton({
+  label = "Google-ээр үргэлжлүүлэх",
+}: {
+  label?: string;
+}) {
   return (
     <button
       type="button"
       onClick={() => signIn("google", { callbackUrl: "/" })}
-      className="w-full flex items-center justify-center gap-3 border border-gray-300 bg-white py-2 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+      className="flex w-full items-center justify-center gap-3 rounded-xl border border-slate-200 bg-white py-2.5 text-sm font-medium text-slate-700 transition-all hover:border-slate-300 hover:bg-slate-50"
     >
       <svg width="18" height="18" viewBox="0 0 18 18" xmlns="http://www.w3.org/2000/svg">
         <path d="M17.64 9.205c0-.639-.057-1.252-.164-1.841H9v3.481h4.844a4.14 4.14 0 0 1-1.796 2.716v2.259h2.908c1.702-1.567 2.684-3.875 2.684-6.615z" fill="#4285F4"/>

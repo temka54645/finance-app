@@ -1,61 +1,104 @@
 "use client";
 
 import { Banknote, Users, Receipt, Briefcase } from "lucide-react";
+import type { ReactNode } from "react";
 
-interface Highlight {
+interface HighlightItem {
   amount: number;
   count: number;
 }
 
 interface Props {
-  bankFees: Highlight;
-  salaryPaid: Highlight;
-  taxes: Highlight;
-  salaryReceived: Highlight;
+  bankFees: HighlightItem;
+  salaryPaid: HighlightItem;
+  taxes: HighlightItem;
+  salaryReceived: HighlightItem;
 }
 
 function fmt(n: number) {
   return n.toLocaleString("mn-MN", { maximumFractionDigits: 0 }) + "₮";
 }
 
-interface CardProps {
-  label: string;
-  data: Highlight;
-  icon: React.ReactNode;
-  color: "blue" | "purple" | "amber" | "green";
-}
+type Accent = "amber" | "purple" | "blue" | "emerald";
 
-const COLORS = {
-  blue:   { bg: "bg-blue-50",   border: "border-blue-200",   text: "text-blue-700",   icon: "text-blue-500",   value: "text-blue-900" },
-  purple: { bg: "bg-purple-50", border: "border-purple-200", text: "text-purple-700", icon: "text-purple-500", value: "text-purple-900" },
-  amber:  { bg: "bg-amber-50",  border: "border-amber-200",  text: "text-amber-700",  icon: "text-amber-500",  value: "text-amber-900" },
-  green:  { bg: "bg-green-50",  border: "border-green-200",  text: "text-green-700",  icon: "text-green-500",  value: "text-green-900" },
+const PALETTES: Record<Accent, string> = {
+  amber:   "bg-amber-100 text-amber-700 border-amber-200",
+  purple:  "bg-purple-100 text-purple-700 border-purple-200",
+  blue:    "bg-blue-100 text-blue-700 border-blue-200",
+  emerald: "bg-emerald-100 text-emerald-700 border-emerald-200",
 };
 
-function Card({ label, data, icon, color }: CardProps) {
-  const c = COLORS[color];
+function Highlight({
+  label,
+  amount,
+  count,
+  icon,
+  accent,
+}: {
+  label: string;
+  amount: number;
+  count: number;
+  icon: ReactNode;
+  accent: Accent;
+}) {
   return (
-    <div className={`${c.bg} border ${c.border} rounded-xl p-4`}>
-      <div className="flex items-center justify-between mb-2">
-        <span className={`text-xs font-medium ${c.text}`}>{label}</span>
-        <span className={c.icon}>{icon}</span>
+    <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-md shadow-slate-200/50 transition-colors hover:bg-slate-50">
+      <div className="flex items-center justify-between">
+        <span className="text-xs font-medium text-slate-500">{label}</span>
+        <span className={`flex h-7 w-7 items-center justify-center rounded-lg border ${PALETTES[accent]}`}>
+          {icon}
+        </span>
       </div>
-      <p className={`text-xl font-bold ${c.value}`}>{fmt(data.amount)}</p>
-      <p className={`text-xs ${c.text} mt-1`}>{data.count} гүйлгээ</p>
+      <p className="mt-3 text-lg font-semibold tabular-nums text-slate-900">{fmt(amount)}</p>
+      <p className="mt-0.5 text-xs text-slate-500">{count} гүйлгээ</p>
     </div>
   );
 }
 
-export default function HighlightCards({ bankFees, salaryPaid, taxes, salaryReceived }: Props) {
+export default function HighlightCards({
+  bankFees,
+  salaryPaid,
+  taxes,
+  salaryReceived,
+}: Props) {
   return (
-    <div>
-      <h3 className="text-sm font-semibold text-gray-700 mb-3">Анхаарах дүнгүүд</h3>
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <Card label="Банкны шимтгэл" data={bankFees} icon={<Receipt className="w-4 h-4" />} color="amber" />
-        <Card label="Цалин зарлага" data={salaryPaid} icon={<Users className="w-4 h-4" />} color="purple" />
-        <Card label="Татвар" data={taxes} icon={<Briefcase className="w-4 h-4" />} color="blue" />
-        <Card label="Цалин (орлого)" data={salaryReceived} icon={<Banknote className="w-4 h-4" />} color="green" />
+    <section>
+      <div className="mb-4">
+        <h3 className="text-sm font-semibold uppercase tracking-wider text-slate-700">
+          Анхаарах дүнгүүд
+        </h3>
+        <p className="mt-1 text-xs text-slate-500">Хамгийн их давтамжтай ангилал</p>
       </div>
-    </div>
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <Highlight
+          label="Банкны шимтгэл"
+          amount={bankFees.amount}
+          count={bankFees.count}
+          icon={<Receipt className="h-4 w-4" />}
+          accent="amber"
+        />
+        <Highlight
+          label="Цалин зарлага"
+          amount={salaryPaid.amount}
+          count={salaryPaid.count}
+          icon={<Users className="h-4 w-4" />}
+          accent="purple"
+        />
+        <Highlight
+          label="Татвар"
+          amount={taxes.amount}
+          count={taxes.count}
+          icon={<Briefcase className="h-4 w-4" />}
+          accent="blue"
+        />
+        <Highlight
+          label="Цалин (орлого)"
+          amount={salaryReceived.amount}
+          count={salaryReceived.count}
+          icon={<Banknote className="h-4 w-4" />}
+          accent="emerald"
+        />
+      </div>
+    </section>
   );
 }

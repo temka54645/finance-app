@@ -3,9 +3,12 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { BarChart2, Loader2 } from "lucide-react";
+import { Loader2, User, Mail, Lock, AlertCircle } from "lucide-react";
 import { signupAction } from "../actions";
 import GoogleSignInButton from "@/components/GoogleSignInButton";
+
+const inputBase =
+  "w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-10 pr-3 text-sm text-slate-900 placeholder:text-slate-400 transition-all focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/15";
 
 export default function SignupPage() {
   const router = useRouter();
@@ -30,87 +33,108 @@ export default function SignupPage() {
   };
 
   return (
-    <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
-      <div className="flex items-center gap-3 mb-6">
-        <div className="w-9 h-9 bg-blue-600 rounded-lg flex items-center justify-center">
-          <BarChart2 className="w-5 h-5 text-white" />
-        </div>
-        <div>
-          <h1 className="text-lg font-bold text-gray-900">Бүртгэл үүсгэх</h1>
-          <p className="text-xs text-gray-500">Санхүүгийн дүн шинжилгээ</p>
-        </div>
+    <div className="rounded-2xl border border-slate-200 bg-white/80 p-8 shadow-xl shadow-blue-200/30 backdrop-blur-xl">
+      <div className="mb-7 space-y-1.5">
+        <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Бүртгэл үүсгэх</h1>
+        <p className="text-sm text-slate-500">Хэдхэн секундэд бэлэн болно</p>
       </div>
 
       <form onSubmit={onSubmit} className="space-y-4">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Нэр (заавал биш)</label>
-          <input
-            type="text"
-            name="name"
-            maxLength={80}
-            className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
+        <div className="space-y-1.5">
+          <label className="block text-xs font-medium uppercase tracking-wide text-slate-500">
+            Нэр <span className="text-slate-400 normal-case">(заавал биш)</span>
+          </label>
+          <div className="group relative">
+            <User className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 transition-colors group-focus-within:text-blue-600" />
+            <input type="text" name="name" maxLength={80} placeholder="Таны нэр" className={inputBase} />
+          </div>
         </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Имэйл</label>
-          <input
-            type="email"
-            name="email"
-            required
-            autoComplete="email"
-            className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
+
+        <div className="space-y-1.5">
+          <label className="block text-xs font-medium uppercase tracking-wide text-slate-500">
+            Имэйл
+          </label>
+          <div className="group relative">
+            <Mail className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 transition-colors group-focus-within:text-blue-600" />
+            <input
+              type="email"
+              name="email"
+              required
+              autoComplete="email"
+              placeholder="you@example.com"
+              className={inputBase}
+            />
+          </div>
         </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Нууц үг (8+ тэмдэгт)</label>
-          <input
-            type="password"
-            name="password"
-            required
-            minLength={8}
-            autoComplete="new-password"
-            className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Нууц үг давтах</label>
-          <input
-            type="password"
-            name="confirm"
-            required
-            minLength={8}
-            autoComplete="new-password"
-            className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
+
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div className="space-y-1.5">
+            <label className="block text-xs font-medium uppercase tracking-wide text-slate-500">
+              Нууц үг
+            </label>
+            <div className="group relative">
+              <Lock className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 transition-colors group-focus-within:text-blue-600" />
+              <input
+                type="password"
+                name="password"
+                required
+                minLength={8}
+                autoComplete="new-password"
+                placeholder="8+ тэмдэгт"
+                className={inputBase}
+              />
+            </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="block text-xs font-medium uppercase tracking-wide text-slate-500">
+              Давтан
+            </label>
+            <div className="group relative">
+              <Lock className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 transition-colors group-focus-within:text-blue-600" />
+              <input
+                type="password"
+                name="confirm"
+                required
+                minLength={8}
+                autoComplete="new-password"
+                placeholder="••••••••"
+                className={inputBase}
+              />
+            </div>
+          </div>
         </div>
 
         {error && (
-          <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
-            {error}
+          <div className="flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 px-3.5 py-2.5 text-sm text-red-700">
+            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+            <span>{error}</span>
           </div>
         )}
 
         <button
           type="submit"
           disabled={pending}
-          className="w-full bg-blue-600 text-white py-2 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-60 flex items-center justify-center gap-2"
+          className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-500 to-indigo-600 py-2.5 text-sm font-semibold text-white shadow-lg shadow-blue-500/30 transition-all hover:shadow-xl hover:shadow-blue-500/40 hover:brightness-110 disabled:opacity-60"
         >
-          {pending && <Loader2 className="w-4 h-4 animate-spin" />}
+          {pending && <Loader2 className="h-4 w-4 animate-spin" />}
           Бүртгүүлэх
         </button>
       </form>
 
-      <div className="flex items-center gap-3 my-4">
-        <div className="flex-1 h-px bg-gray-200" />
-        <span className="text-xs text-gray-400">эсвэл</span>
-        <div className="flex-1 h-px bg-gray-200" />
+      <div className="my-5 flex items-center gap-3">
+        <div className="h-px flex-1 bg-slate-200" />
+        <span className="text-xs uppercase tracking-wider text-slate-400">эсвэл</span>
+        <div className="h-px flex-1 bg-slate-200" />
       </div>
 
       <GoogleSignInButton label="Google-ээр бүртгүүлэх" />
 
-      <p className="text-sm text-center text-gray-500 mt-4">
+      <p className="mt-6 text-center text-sm text-slate-500">
         Аль хэдийн бүртгэлтэй юу?{" "}
-        <Link href="/login" className="text-blue-600 hover:underline">Нэвтрэх</Link>
+        <Link href="/login" className="font-medium text-blue-600 transition-colors hover:text-blue-700">
+          Нэвтрэх
+        </Link>
       </p>
     </div>
   );
