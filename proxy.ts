@@ -19,24 +19,9 @@ export default auth(async (req) => {
     return NextResponse.redirect(new URL("/login", req.url));
   }
 
-  // Logged in but userType not set → /onboarding
-  // (онцгой: /onboarding, /api/user, /api/auth, /api/health-ийг алгасна)
-  if (
-    isLoggedIn &&
-    !pathname.startsWith("/onboarding") &&
-    !pathname.startsWith("/api/user") &&
-    !pathname.startsWith("/api/auth") &&
-    !pathname.startsWith("/api/health") &&
-    !pathname.startsWith("/_next")
-  ) {
-    // Session-аас шууд авах боломжгүй (jwt-д userType байхгүй), тиймээс fetch шаардлагатай.
-    // Гэхдээ proxy.ts нь Edge runtime-д ажиллаж байгаа тул Prisma шууд дуудах боломжгүй.
-    // Шийдэл: jwt callback-д userType-ыг session-руу нэмж дамжуулах (доорх auth.ts засвар).
-    const userType = (req.auth?.user as { userType?: string | null } | undefined)?.userType;
-    if (!userType) {
-      return NextResponse.redirect(new URL("/onboarding", req.url));
-    }
-  }
+  // userType шалгахыг proxy-д НЭ хийнэ — JWT staleness асуудлаас болж
+  // server-side page (app/page.tsx)-д шалгана. Ингэснээр PATCH /api/user-ийн
+  // дараа шууд DB-аас уншиж зөв шийдвэр гаргана.
 
   return NextResponse.next();
 });

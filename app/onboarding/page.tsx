@@ -1,15 +1,11 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
-import { useSession } from "next-auth/react";
 import { User, Building2, Loader2, ArrowRight, BarChart2, Check } from "lucide-react";
 
 type UserType = "personal" | "business";
 
 export default function OnboardingPage() {
-  const router = useRouter();
-  const { update: updateSession } = useSession();
   const [pending, startTransition] = useTransition();
   const [selected, setSelected] = useState<UserType | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -24,11 +20,13 @@ export default function OnboardingPage() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ userType: selected }),
         });
-        if (!res.ok) throw new Error("Хадгалж чадсангүй");
-        // JWT-ийг шинэчлэх — jwt callback trigger="update"-ыг ажиллуулна
-        await updateSession();
-        router.push("/");
-        router.refresh();
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          throw new Error(data.error ?? "Хадгалж чадсангүй");
+        }
+        // Full reload — JWT-ийн staleness асуудал гарахгүй,
+        // server-side page DB-ээс шууд userType-ыг уншиж шалгана
+        window.location.href = "/";
       } catch (e) {
         setError(e instanceof Error ? e.message : "Алдаа");
       }
