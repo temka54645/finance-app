@@ -62,8 +62,16 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         token.id = user.id;
         token.userType = (user as { userType?: string | null }).userType ?? null;
       }
-      // session update үед (onboarding-ийн дараа гэх мэт) DB-аас дахин уншина
+      // session update үед (онбординг дараа г.м) DB-аас дахин уншина
       if (trigger === "update" && token.id) {
+        const u = await prisma.user.findUnique({
+          where: { id: token.id as string },
+          select: { userType: true },
+        });
+        token.userType = u?.userType ?? null;
+      }
+      // Хуучин JWT-д userType дутуу бол DB-аас нэг удаа сэргээх
+      if (token.id && token.userType === undefined) {
         const u = await prisma.user.findUnique({
           where: { id: token.id as string },
           select: { userType: true },

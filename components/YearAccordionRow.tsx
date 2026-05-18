@@ -19,7 +19,6 @@ interface Props {
   months: Month[];
   expanded: boolean;
   onToggle: () => void;
-  onOpenDetail: (year: number, month: number) => void;
   onUploadSuccess: () => void;
 }
 
@@ -29,7 +28,7 @@ function fmt(n: number): string {
 
 export default function YearAccordionRow({
   year, totalIncome, totalExpense, balance, txCount, months,
-  expanded, onToggle, onOpenDetail, onUploadSuccess,
+  expanded, onToggle, onUploadSuccess,
 }: Props) {
   return (
     <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-shadow">
@@ -88,7 +87,6 @@ export default function YearAccordionRow({
                 income={m.income}
                 expense={m.expense}
                 txCount={m.txCount}
-                onOpenDetail={onOpenDetail}
                 onUploadSuccess={onUploadSuccess}
               />
             ))}

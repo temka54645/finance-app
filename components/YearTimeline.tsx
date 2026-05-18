@@ -3,7 +3,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { Loader2, Calendar } from "lucide-react";
 import YearAccordionRow from "./YearAccordionRow";
-import MonthDetailDrawer from "./MonthDetailDrawer";
 import FileUpload from "./FileUpload";
 
 interface MonthData {
@@ -23,7 +22,7 @@ interface YearData {
 }
 
 interface Props {
-  onChange: () => void; // parent (page)-руу dashboard overview refetch гэдгийг мэдэгдэх
+  onChange: () => void;
 }
 
 export default function YearTimeline({ onChange }: Props) {
@@ -32,7 +31,6 @@ export default function YearTimeline({ onChange }: Props) {
   const [expandedYears, setExpandedYears] = useState<Set<number>>(
     () => new Set([new Date().getFullYear()])
   );
-  const [detail, setDetail] = useState<{ year: number; month: number } | null>(null);
 
   const fetchTimeline = useCallback(async () => {
     setLoading(true);
@@ -40,7 +38,6 @@ export default function YearTimeline({ onChange }: Props) {
       const res = await fetch("/api/timeline");
       const data = await res.json();
       setTimeline(data.timeline ?? []);
-      // Эхний жилийг автомат expand хийнэ (хэрэв одоогийн жил байхгүй бол)
       if (data.timeline && data.timeline.length > 0) {
         setExpandedYears(prev => {
           const next = new Set(prev);
@@ -77,7 +74,6 @@ export default function YearTimeline({ onChange }: Props) {
     );
   }
 
-  // Empty state
   if (timeline.length === 0) {
     return (
       <div className="bg-white border border-gray-200 rounded-xl p-8 text-center">
@@ -98,34 +94,21 @@ export default function YearTimeline({ onChange }: Props) {
   }
 
   return (
-    <>
-      <div className="space-y-3">
-        {timeline.map(y => (
-          <YearAccordionRow
-            key={y.year}
-            year={y.year}
-            totalIncome={y.totalIncome}
-            totalExpense={y.totalExpense}
-            balance={y.balance}
-            txCount={y.txCount}
-            months={y.months}
-            expanded={expandedYears.has(y.year)}
-            onToggle={() => toggleYear(y.year)}
-            onOpenDetail={(year, month) => setDetail({ year, month })}
-            onUploadSuccess={handleRefetch}
-          />
-        ))}
-      </div>
-
-      {detail && (
-        <MonthDetailDrawer
-          open={!!detail}
-          year={detail.year}
-          month={detail.month}
-          onClose={() => setDetail(null)}
-          onChange={handleRefetch}
+    <div className="space-y-3">
+      {timeline.map(y => (
+        <YearAccordionRow
+          key={y.year}
+          year={y.year}
+          totalIncome={y.totalIncome}
+          totalExpense={y.totalExpense}
+          balance={y.balance}
+          txCount={y.txCount}
+          months={y.months}
+          expanded={expandedYears.has(y.year)}
+          onToggle={() => toggleYear(y.year)}
+          onUploadSuccess={handleRefetch}
         />
-      )}
-    </>
+      ))}
+    </div>
   );
 }

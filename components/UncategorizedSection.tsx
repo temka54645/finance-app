@@ -1,10 +1,9 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
+import { useSession } from "next-auth/react";
 import { AlertCircle, ChevronDown, ChevronUp, Check, Loader2 } from "lucide-react";
-
-const INCOME_CATEGORIES = ["Цалин", "Шилжүүлэг хүлээн авсан", "Буцаалт", "Хүү", "Бусад орлого"];
-const EXPENSE_CATEGORIES = ["Банкны шимтгэл", "Цалин зарлага", "Хоол & Ресторан", "Тээвэр", "Худалдаа", "Коммунал", "Эрүүл мэнд", "Боловсрол", "Цэвэрлэгээ & Засвар", "Татвар", "Бусад зарлага"];
+import { getIncomeGroups, getExpenseGroups, type UserType } from "@/lib/categories";
 
 interface Transaction {
   id: string;
@@ -26,6 +25,14 @@ function fmt(n: number) {
 }
 
 export default function UncategorizedSection({ statementId, count, onUpdate }: Props) {
+  const { data: session } = useSession();
+  const userType: UserType = ((session?.user as { userType?: string | null } | undefined)?.userType === "business")
+    ? "business"
+    : "personal";
+
+  const incomeGroups = useMemo(() => getIncomeGroups(userType), [userType]);
+  const expenseGroups = useMemo(() => getExpenseGroups(userType), [userType]);
+
   const [expanded, setExpanded] = useState(false);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(false);
@@ -139,15 +146,19 @@ export default function UncategorizedSection({ statementId, count, onUpdate }: P
                   <select
                     value={bulkCategory}
                     onChange={e => setBulkCategory(e.target.value)}
-                    className="border rounded px-2 py-1 text-sm flex-1 min-w-[180px]"
+                    className="border rounded px-2 py-1 text-sm flex-1 min-w-[200px]"
                   >
                     <option value="">Категори сонгох...</option>
-                    <optgroup label="Орлого">
-                      {INCOME_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
-                    </optgroup>
-                    <optgroup label="Зарлага">
-                      {EXPENSE_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
-                    </optgroup>
+                    {incomeGroups.map(g => (
+                      <optgroup key={`in-${g.id}`} label={`📈 ${g.name}`}>
+                        {g.items.map(i => <option key={i.id} value={i.name}>{i.name}</option>)}
+                      </optgroup>
+                    ))}
+                    {expenseGroups.map(g => (
+                      <optgroup key={`out-${g.id}`} label={`📉 ${g.name}`}>
+                        {g.items.map(i => <option key={i.id} value={i.name}>{i.name}</option>)}
+                      </optgroup>
+                    ))}
                   </select>
                   <button
                     onClick={applyBulk}
@@ -171,7 +182,7 @@ export default function UncategorizedSection({ statementId, count, onUpdate }: P
             ) : (
               <div className="divide-y divide-gray-100">
                 {transactions.map(t => {
-                  const categories = t.type === "income" ? INCOME_CATEGORIES : EXPENSE_CATEGORIES;
+                  const groups = t.type === "income" ? incomeGroups : expenseGroups;
                   return (
                     <div key={t.id} className="flex items-center gap-3 p-3 hover:bg-gray-50">
                       <input
@@ -193,10 +204,14 @@ export default function UncategorizedSection({ statementId, count, onUpdate }: P
                         defaultValue=""
                         onChange={e => e.target.value && updateSingle(t.id, e.target.value)}
                         disabled={saving}
-                        className="border rounded px-2 py-1 text-xs w-40"
+                        className="border rounded px-2 py-1 text-xs w-48"
                       >
                         <option value="" disabled>Категори сонгох...</option>
-                        {categories.map(c => <option key={c} value={c}>{c}</option>)}
+                        {groups.map(g => (
+                          <optgroup key={g.id} label={g.name}>
+                            {g.items.map(i => <option key={i.id} value={i.name}>{i.name}</option>)}
+                          </optgroup>
+                        ))}
                       </select>
                     </div>
                   );

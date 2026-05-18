@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { Upload, Eye, X, ExternalLink } from "lucide-react";
+import { Upload, ExternalLink, X } from "lucide-react";
 import FileUpload from "./FileUpload";
 
 const MONTH_NAMES = [
@@ -15,7 +15,6 @@ interface Props {
   income: number;
   expense: number;
   txCount: number;
-  onOpenDetail: (year: number, month: number) => void;
   onUploadSuccess: () => void;
 }
 
@@ -26,7 +25,7 @@ function fmt(n: number): string {
   return Math.round(n).toString();
 }
 
-export default function MonthRow({ year, month, income, expense, txCount, onOpenDetail, onUploadSuccess }: Props) {
+export default function MonthRow({ year, month, income, expense, txCount, onUploadSuccess }: Props) {
   const [uploadOpen, setUploadOpen] = useState(false);
   const popoverRef = useRef<HTMLDivElement>(null);
   const balance = income - expense;
@@ -48,46 +47,52 @@ export default function MonthRow({ year, month, income, expense, txCount, onOpen
     };
   }, [uploadOpen]);
 
+  const detailHref = `/y/${year}/${month}`;
+
   return (
     <div className={`relative grid grid-cols-[1fr_auto_auto_auto_auto] items-center gap-3 px-4 py-2.5 rounded-lg transition-colors ${
-      isEmpty ? "opacity-50" : "hover:bg-blue-50/40"
+      isEmpty ? "opacity-60" : "hover:bg-blue-50/40"
     }`}>
-      <div className="flex items-center gap-3 min-w-0">
+      {/* Click target — opens detail in new tab (зөвхөн данс байгаа үед) */}
+      {!isEmpty ? (
+        <a
+          href={detailHref}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="absolute inset-0 z-0"
+          title="Шинэ цонхонд дэлгэрэнгүй нээх"
+          aria-label={`${year} оны ${MONTH_NAMES[month - 1]} дэлгэрэнгүй`}
+        />
+      ) : null}
+
+      <div className="flex items-center gap-3 min-w-0 relative pointer-events-none">
         <span className="text-xs font-medium text-gray-500 w-12">{year}</span>
         <span className="text-sm font-medium text-gray-800">{MONTH_NAMES[month - 1]}</span>
         {!isEmpty && <span className="text-xs text-gray-400">· {txCount} гүйлгээ</span>}
       </div>
 
-      <span className={`text-sm font-semibold tabular-nums ${income > 0 ? "text-green-600" : "text-gray-300"}`}>
+      <span className={`text-sm font-semibold tabular-nums relative pointer-events-none ${income > 0 ? "text-green-600" : "text-gray-300"}`}>
         +{fmt(income)}
       </span>
-      <span className={`text-sm font-semibold tabular-nums ${expense > 0 ? "text-red-600" : "text-gray-300"}`}>
+      <span className={`text-sm font-semibold tabular-nums relative pointer-events-none ${expense > 0 ? "text-red-600" : "text-gray-300"}`}>
         −{fmt(expense)}
       </span>
-      <span className={`text-sm font-semibold tabular-nums w-20 text-right ${
+      <span className={`text-sm font-semibold tabular-nums w-20 text-right relative pointer-events-none ${
         balance === 0 ? "text-gray-300" : balance > 0 ? "text-blue-600" : "text-orange-600"
       }`}>
         {balance >= 0 ? "+" : ""}{fmt(balance)}
       </span>
 
-      <div className="flex items-center gap-1">
+      <div className="flex items-center gap-1 relative z-10">
         <button
           onClick={(e) => { e.stopPropagation(); setUploadOpen(v => !v); }}
           className="p-1.5 text-gray-500 hover:text-blue-600 hover:bg-blue-100 rounded transition-colors"
-          title="Файл оруулах"
+          title="Энэ сарт файл оруулах"
         >
           <Upload className="w-4 h-4" />
         </button>
-        <button
-          onClick={() => onOpenDetail(year, month)}
-          disabled={isEmpty}
-          className="p-1.5 text-gray-500 hover:text-blue-600 hover:bg-blue-100 rounded transition-colors disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent"
-          title="Дэлгэрэнгүй харах (хажуу drawer)"
-        >
-          <Eye className="w-4 h-4" />
-        </button>
         <a
-          href={isEmpty ? undefined : `/y/${year}/${month}`}
+          href={isEmpty ? undefined : detailHref}
           target="_blank"
           rel="noopener noreferrer"
           aria-disabled={isEmpty}
@@ -98,7 +103,7 @@ export default function MonthRow({ year, month, income, expense, txCount, onOpen
               ? "text-gray-300 cursor-not-allowed pointer-events-none"
               : "text-gray-500 hover:text-blue-600 hover:bg-blue-100"
           }`}
-          title="Шинэ цонхонд бүтэн дэлгэцээр нээх"
+          title="Шинэ цонхонд дэлгэрэнгүй нээх"
         >
           <ExternalLink className="w-4 h-4" />
         </a>

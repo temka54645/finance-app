@@ -2,8 +2,8 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { LogOut, User as UserIcon, ChevronDown, FileText, Tags } from "lucide-react";
-import { signOut } from "next-auth/react";
+import { LogOut, User as UserIcon, ChevronDown, FileText, Tags, Building2 } from "lucide-react";
+import { signOut, useSession } from "next-auth/react";
 
 interface Props {
   email: string;
@@ -11,6 +11,11 @@ interface Props {
 }
 
 export default function UserMenu({ email, name }: Props) {
+  const { data: session } = useSession();
+  const userType = (session?.user as { userType?: string | null } | undefined)?.userType;
+  const isBusiness = userType === "business";
+  const isPersonal = userType === "personal";
+
   const [open, setOpen] = useState(false);
   const display = name || email;
 
@@ -21,7 +26,11 @@ export default function UserMenu({ email, name }: Props) {
         className="flex items-center gap-2 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
       >
         <div className="w-7 h-7 bg-blue-100 rounded-full flex items-center justify-center">
-          <UserIcon className="w-4 h-4 text-blue-600" />
+          {isBusiness ? (
+            <Building2 className="w-4 h-4 text-blue-600" />
+          ) : (
+            <UserIcon className="w-4 h-4 text-blue-600" />
+          )}
         </div>
         <span className="max-w-[140px] truncate">{display}</span>
         <ChevronDown className="w-3 h-3 text-gray-400" />
@@ -30,10 +39,20 @@ export default function UserMenu({ email, name }: Props) {
       {open && (
         <>
           <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
-          <div className="absolute right-0 top-full mt-1 w-56 bg-white border border-gray-200 rounded-lg shadow-lg z-20 py-1">
+          <div className="absolute right-0 top-full mt-1 w-64 bg-white border border-gray-200 rounded-lg shadow-lg z-20 py-1">
             <div className="px-3 py-2 border-b border-gray-100">
               <p className="text-xs text-gray-400">Нэвтэрсэн</p>
               <p className="text-sm font-medium text-gray-800 truncate">{email}</p>
+              {(isBusiness || isPersonal) && (
+                <span className={`inline-flex items-center gap-1 mt-2 px-2 py-0.5 rounded-full text-[10px] font-medium ${
+                  isBusiness
+                    ? "bg-indigo-100 text-indigo-700"
+                    : "bg-blue-100 text-blue-700"
+                }`}>
+                  {isBusiness ? <Building2 className="w-3 h-3" /> : <UserIcon className="w-3 h-3" />}
+                  {isBusiness ? "Байгууллага" : "Хувь хүн"}
+                </span>
+              )}
             </div>
             <Link
               href="/categories"
