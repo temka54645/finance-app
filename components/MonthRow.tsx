@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { Upload, Eye, Loader2, X } from "lucide-react";
+import { Upload, Eye, X, ExternalLink } from "lucide-react";
 import FileUpload from "./FileUpload";
 
 const MONTH_NAMES = [
@@ -82,10 +82,26 @@ export default function MonthRow({ year, month, income, expense, txCount, onOpen
           onClick={() => onOpenDetail(year, month)}
           disabled={isEmpty}
           className="p-1.5 text-gray-500 hover:text-blue-600 hover:bg-blue-100 rounded transition-colors disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent"
-          title="Дэлгэрэнгүй харах"
+          title="Дэлгэрэнгүй харах (хажуу drawer)"
         >
           <Eye className="w-4 h-4" />
         </button>
+        <a
+          href={isEmpty ? undefined : `/y/${year}/${month}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-disabled={isEmpty}
+          tabIndex={isEmpty ? -1 : 0}
+          onClick={e => isEmpty && e.preventDefault()}
+          className={`p-1.5 rounded transition-colors ${
+            isEmpty
+              ? "text-gray-300 cursor-not-allowed pointer-events-none"
+              : "text-gray-500 hover:text-blue-600 hover:bg-blue-100"
+          }`}
+          title="Шинэ цонхонд бүтэн дэлгэцээр нээх"
+        >
+          <ExternalLink className="w-4 h-4" />
+        </a>
       </div>
 
       {uploadOpen && (

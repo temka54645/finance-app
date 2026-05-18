@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Pencil, Check, X, Trash2, TrendingUp, TrendingDown } from "lucide-react";
+import { getCategoryStyle } from "@/lib/category-icons";
 
 interface Transaction {
   id: string;
@@ -116,9 +117,16 @@ export default function TransactionTable({ transactions, onUpdate }: Props) {
                   >
                     {categories.map(c => <option key={c} value={c}>{c}</option>)}
                   </select>
-                ) : (
-                  <span className="text-gray-700">{t.category}</span>
-                )}
+                ) : (() => {
+                  const style = getCategoryStyle(t.category);
+                  const Icon = style.icon;
+                  return (
+                    <span className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-xs ${style.bg} ${style.text}`}>
+                      <Icon className="w-3.5 h-3.5" />
+                      {t.category}
+                    </span>
+                  );
+                })()}
               </td>
               <td className={`px-4 py-3 text-right font-medium whitespace-nowrap ${
                 t.type === "income" ? "text-green-600" : "text-red-600"

@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { LogOut, User as UserIcon, ChevronDown } from "lucide-react";
+import Link from "next/link";
+import { LogOut, User as UserIcon, ChevronDown, FileText } from "lucide-react";
 import { signOut } from "next-auth/react";
 
 interface Props {
@@ -34,6 +35,15 @@ export default function UserMenu({ email, name }: Props) {
               <p className="text-xs text-gray-400">Нэвтэрсэн</p>
               <p className="text-sm font-medium text-gray-800 truncate">{email}</p>
             </div>
+            <Link
+              href="/statements"
+              onClick={() => setOpen(false)}
+              className="w-full px-3 py-2 text-sm text-left text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+            >
+              <FileText className="w-4 h-4 text-gray-400" />
+              Хуулга удирдах
+            </Link>
+            <div className="border-t border-gray-100 my-1" />
             <button
               onClick={() => signOut({ callbackUrl: "/login" })}
               className="w-full px-3 py-2 text-sm text-left text-red-600 hover:bg-red-50 flex items-center gap-2"
