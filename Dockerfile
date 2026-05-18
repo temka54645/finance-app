@@ -18,7 +18,17 @@ RUN npx prisma generate
 ENV NEXT_TELEMETRY_DISABLED=1
 RUN npm run build
 
-# ── 3. runner ────────────────────────────────────────────────────
+# ── 3. migrate-deps (Prisma CLI-н бүх transitive deps-тэй цэвэр install) ────
+FROM node:20-alpine AS migrate-deps
+WORKDIR /app
+RUN apk add --no-cache libc6-compat
+COPY package*.json ./
+COPY prisma ./prisma
+COPY prisma.config.ts ./
+# Зөвхөн prisma migration ажиллуулахад хэрэгцээтэй deps:
+RUN npm install --omit=optional --no-audit --no-fund prisma @prisma/client @prisma/adapter-pg pg dotenv
+
+# ── 4. runner ────────────────────────────────────────────────────
 FROM node:20-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production
@@ -29,20 +39,21 @@ ENV HOSTNAME=0.0.0.0
 RUN addgroup --system --gid 1001 nodejs \
  && adduser --system --uid 1001 nextjs
 
+# Next.js standalone (өөрөө node_modules-ын subset-тэй)
 COPY --from=builder /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
-COPY --from=builder --chown=nextjs:nodejs /app/prisma ./prisma
 COPY --from=builder --chown=nextjs:nodejs /app/app/generated ./app/generated
-# Prisma CLI (`prisma migrate deploy` need it) — standalone build doesn't include it
-COPY --from=builder --chown=nextjs:nodejs /app/node_modules/prisma ./node_modules/prisma
-COPY --from=builder --chown=nextjs:nodejs /app/node_modules/@prisma ./node_modules/@prisma
+
+# Migration ажиллуулахад хэрэгтэй prisma CLI + бүх transitive deps
+COPY --from=migrate-deps --chown=nextjs:nodejs /app/node_modules ./prisma-cli-modules
+COPY --from=builder --chown=nextjs:nodejs /app/prisma ./prisma
 COPY --from=builder --chown=nextjs:nodejs /app/prisma.config.ts ./prisma.config.ts
+COPY --from=builder --chown=nextjs:nodejs /app/package.json ./package.json
 
 USER nextjs
 EXPOSE 3000
 
-# Migrate-ийг хийгээд server.js (Next.js standalone) ажиллуулна.
-# `node node_modules/prisma/build/index.js` — npx-гүйгээр шууд CLI дуудаж байна
-# (standalone build-д .bin shim байхгүй).
-CMD ["sh","-c","node node_modules/prisma/build/index.js migrate deploy && node server.js"]
+# Migrate-ийн node_modules-ыг түр зам дээр зааж, migrate deploy ажиллуулна.
+# Дараа нь Next.js standalone server.js ажиллана (өөрийн node_modules-той).
+CMD ["sh","-c","NODE_PATH=/app/prisma-cli-modules node /app/prisma-cli-modules/prisma/build/index.js migrate deploy && node server.js"]
