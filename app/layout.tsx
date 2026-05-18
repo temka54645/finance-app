@@ -1,20 +1,18 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Montserrat } from "next/font/google";
 import "./globals.css";
 import SessionProviderWrapper from "@/components/SessionProviderWrapper";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
+// Lovable дизайнаас — Montserrat (300..800).
+const montserrat = Montserrat({
+  variable: "--font-montserrat",
+  subsets: ["latin", "cyrillic"],
+  weight: ["300", "400", "500", "600", "700", "800"],
+  display: "swap",
 });
 
 export const metadata: Metadata = {
-  title: "Санхүүгийн дүн шинжилгээ",
+  title: "Finance Analytics — Санхүүгийн дүн шинжилгээ",
   description: "Банкны хуулга задлан шинжилгээ",
 };
 
@@ -26,7 +24,7 @@ export default function RootLayout({
   return (
     <html
       lang="mn"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${montserrat.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
         <SessionProviderWrapper>{children}</SessionProviderWrapper>
