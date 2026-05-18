@@ -1,17 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { requireUserId, UnauthorizedError } from "@/lib/auth-helpers";
 import { parsePDF } from "@/lib/parsers/pdf";
 import { parseCSV, extractRawRows, type ParsedTransaction } from "@/lib/parsers/excel";
 import { parseWithBankDetection } from "@/lib/parsers/banks";
 import { categorizeTransactions } from "@/lib/ai/categorize";
 import { aiExtractTransactions } from "@/lib/ai/extract";
 
-// Том файл upload-ыг зөвшөөрөх
-export const maxDuration = 120; // секунд
+export const maxDuration = 120;
 export const runtime = "nodejs";
 
 export async function POST(req: NextRequest) {
   try {
+    const userId = await requireUserId();
+
     const formData = await req.formData();
     const file = formData.get("file") as File | null;
     const bankNameInput = formData.get("bankName") as string | null;
@@ -35,18 +37,11 @@ export async function POST(req: NextRequest) {
       const result = parseWithBankDetection(buffer);
       parsed = result.transactions;
       detectedBank = result.detectedBank;
-      if (detectedBank) {
-        console.log(`[upload] ${fileName}: detected ${detectedBank}, found ${parsed.length} transactions`);
-      } else {
-        console.log(`[upload] ${fileName}: generic parser found ${parsed.length} transactions`);
-      }
     } else {
       return NextResponse.json({ error: "Дэмжигдэхгүй файлын төрөл" }, { status: 400 });
     }
 
-    // AI fallback зөвхөн Excel/CSV-д
     if (parsed.length === 0 && (ext === "xlsx" || ext === "xls" || ext === "csv")) {
-      console.log(`[upload] ${fileName}: falling back to AI parser`);
       const rawRows = extractRawRows(buffer);
       parsed = await aiExtractTransactions(rawRows);
     }
@@ -65,21 +60,16 @@ export async function POST(req: NextRequest) {
 
     const statement = await prisma.statement.create({
       data: {
+        userId,
         fileName,
         bankName: finalBankName || null,
         transactions: {
           create: parsed.map((t, i) => {
-            // Parser-ийн дохио = эцсийн шийдвэр (банкны хуулга дотрох
-            // Орлого/Зарлага багана хамгийн найдвартай эх сурвалж).
-            // AI зөвхөн категори нэр санал болгох (харин income/expense биш).
+            const cat = categorized[i];
             const type: "income" | "expense" = t.amount >= 0 ? "income" : "expense";
-            const aiCat = categorized[i];
-
-            // AI category-ийг зөвхөн төрөл нь parser-тэй таарсан тохиолдолд авна
-            const category = (aiCat && aiCat.type === type)
-              ? aiCat.category
+            const category = (cat && cat.type === type)
+              ? cat.category
               : (type === "income" ? "Бусад орлого" : "Бусад зарлага");
-
             return {
               date: t.date,
               description: t.description,
@@ -101,8 +91,12 @@ export async function POST(req: NextRequest) {
       expenseCount: statement.transactions.filter(t => t.type === "expense").length,
     });
   } catch (err) {
+    if (err instanceof UnauthorizedError) {
+      return NextResponse.json({ error: err.message }, { status: 401 });
+    }
     console.error("[upload] error:", err);
-    const message = err instanceof Error ? err.message : "Серверийн алдаа";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json({
+      error: err instanceof Error ? err.message : "Серверийн алдаа"
+    }, { status: 500 });
   }
 }

@@ -4,15 +4,77 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
 }
+
+// ── Auth.js v5 / NextAuth schema ───────────────────────────────────
+
+model User {
+  id             String    @id @default(cuid())
+  email          String    @unique
+  emailVerified  DateTime?
+  name           String?
+  image          String?
+  hashedPassword String?
+  createdAt      DateTime  @default(now())
+
+  accounts   Account[]
+  sessions   Session[]
+  statements Statement[]
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// ── App-specific models ────────────────────────────────────────────
 
 model Statement {
   id           String        @id @default(cuid())
+  userId       String
   fileName     String
   bankName     String?
   uploadedAt   DateTime      @default(now())
+
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   transactions Transaction[]
+
+  @@index([userId])
 }
 
 model Transaction {
@@ -26,4 +88,7 @@ model Transaction {
   category    String    @default("Ангилаагүй")
   note        String?
   createdAt   DateTime  @default(now())
+
+  @@index([statementId])
+  @@index([date])
 }

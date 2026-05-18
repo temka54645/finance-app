@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
+import { requireUserId, UnauthorizedError } from "@/lib/auth-helpers";
 import { parsePDF } from "@/lib/parsers/pdf";
 import { parseExcel, parseCSV, extractRawRows, type ParsedTransaction } from "@/lib/parsers/excel";
 
 export async function POST(req: NextRequest) {
   try {
+    await requireUserId();
     const formData = await req.formData();
     const file = formData.get("file") as File | null;
     if (!file) return NextResponse.json({ error: "Файл байхгүй" }, { status: 400 });
@@ -31,6 +33,9 @@ export async function POST(req: NextRequest) {
       rawSample,
     });
   } catch (err) {
+    if (err instanceof UnauthorizedError) {
+      return NextResponse.json({ error: err.message }, { status: 401 });
+    }
     return NextResponse.json({
       error: err instanceof Error ? err.message : "error",
     }, { status: 500 });
