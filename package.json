@@ -13,7 +13,10 @@
     "db:generate": "prisma generate",
     "db:studio": "prisma studio",
     "db:up": "docker compose up -d",
-    "db:down": "docker compose down"
+    "db:down": "docker compose down",
+    "sync:fetch": "powershell -ExecutionPolicy Bypass -File scripts/sync-lovable.ps1 fetch",
+    "sync:diff": "powershell -ExecutionPolicy Bypass -File scripts/sync-lovable.ps1 diff",
+    "sync:files": "powershell -ExecutionPolicy Bypass -File scripts/sync-lovable.ps1 files"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.96.0",
