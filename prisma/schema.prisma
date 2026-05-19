@@ -18,6 +18,8 @@ model User {
   hashedPassword String?
   /// "personal" | "business" — null үед onboarding-д шилжинэ
   userType       String?
+  /// "user" | "admin" — admin л /admin самбар үзэх эрхтэй
+  role           String    @default("user")
   createdAt      DateTime  @default(now())
 
   accounts   Account[]

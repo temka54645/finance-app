@@ -33,7 +33,7 @@ const providers: Provider[] = [
       const ok = await bcrypt.compare(parsed.data.password, user.hashedPassword);
       if (!ok) return null;
 
-      return { id: user.id, email: user.email, name: user.name, userType: user.userType };
+      return { id: user.id, email: user.email, name: user.name, userType: user.userType, role: user.role };
     },
   }),
 ];
@@ -57,26 +57,29 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   providers,
   callbacks: {
     jwt: async ({ token, user, trigger }) => {
-      // Шинэ login → user-аас id+userType-ыг token-руу хадгална
+      // Шинэ login → user-аас id+userType+role-г token-руу хадгална
       if (user) {
         token.id = user.id;
         token.userType = (user as { userType?: string | null }).userType ?? null;
+        token.role = (user as { role?: string | null }).role ?? "user";
       }
-      // session update үед (онбординг дараа г.м) DB-аас дахин уншина
+      // session update үед DB-ээс дахин уншина
       if (trigger === "update" && token.id) {
         const u = await prisma.user.findUnique({
           where: { id: token.id as string },
-          select: { userType: true },
+          select: { userType: true, role: true },
         });
         token.userType = u?.userType ?? null;
+        token.role = u?.role ?? "user";
       }
-      // Хуучин JWT-д userType дутуу бол DB-аас нэг удаа сэргээх
-      if (token.id && token.userType === undefined) {
+      // Хуучин JWT-д userType эсвэл role дутуу бол DB-аас сэргээх
+      if (token.id && (token.userType === undefined || token.role === undefined)) {
         const u = await prisma.user.findUnique({
           where: { id: token.id as string },
-          select: { userType: true },
+          select: { userType: true, role: true },
         });
         token.userType = u?.userType ?? null;
+        token.role = u?.role ?? "user";
       }
       return token;
     },
@@ -84,6 +87,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       if (session.user && token.id) {
         session.user.id = token.id as string;
         (session.user as { userType?: string | null }).userType = (token.userType as string | null) ?? null;
+        (session.user as { role?: string | null }).role = (token.role as string | null) ?? "user";
       }
       return session;
     },
