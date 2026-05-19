@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { LogOut, User as UserIcon, ChevronDown, FileText, Tags, Building2, Shield } from "lucide-react";
+import { LogOut, User as UserIcon, ChevronDown, FileText, Tags, Building2 } from "lucide-react";
 import { signOut, useSession } from "next-auth/react";
 
 interface Props {
@@ -13,10 +13,8 @@ interface Props {
 export default function UserMenu({ email, name }: Props) {
   const { data: session } = useSession();
   const userType = (session?.user as { userType?: string | null } | undefined)?.userType;
-  const role = (session?.user as { role?: string | null } | undefined)?.role;
   const isBusiness = userType === "business";
   const isPersonal = userType === "personal";
-  const isAdmin = role === "admin";
 
   const [open, setOpen] = useState(false);
   const display = name || email;
@@ -56,16 +54,6 @@ export default function UserMenu({ email, name }: Props) {
                 </span>
               )}
             </div>
-            {isAdmin && (
-              <Link
-                href="/admin"
-                onClick={() => setOpen(false)}
-                className="w-full px-3 py-2 text-sm text-left flex items-center gap-2 bg-gradient-to-r from-indigo-50 to-purple-50 text-indigo-700 hover:from-indigo-100 hover:to-purple-100"
-              >
-                <Shield className="w-4 h-4 text-indigo-600" />
-                <span className="font-medium">Админ удирдлага</span>
-              </Link>
-            )}
             <Link
               href="/categories"
               onClick={() => setOpen(false)}

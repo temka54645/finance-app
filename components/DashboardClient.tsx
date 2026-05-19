@@ -9,6 +9,7 @@ import HighlightCards from "@/components/HighlightCards";
 import UncategorizedSection from "@/components/UncategorizedSection";
 import YearTimeline from "@/components/YearTimeline";
 import UserMenu from "@/components/UserMenu";
+import FeedbackButton from "@/components/FeedbackButton";
 
 interface Highlight { amount: number; count: number }
 
@@ -193,6 +194,9 @@ export default function DashboardClient() {
           </div>
         </>
       )}
+
+      {/* Floating feedback button — always visible */}
+      <FeedbackButton />
     </div>
   );
 }

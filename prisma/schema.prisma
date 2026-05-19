@@ -18,13 +18,42 @@ model User {
   hashedPassword String?
   /// "personal" | "business" — null үед onboarding-д шилжинэ
   userType       String?
-  /// "user" | "admin" — admin л /admin самбар үзэх эрхтэй
+  /// "user" | "admin" — admin л /sys/control самбар үзэх эрхтэй
   role           String    @default("user")
+  /// "free" | "pro" | "business" — үйлчилгээний багц
+  plan           String    @default("free")
+  /// "active" | "overdue" | "cancelled" — төлбөрийн төлөв
+  paymentStatus  String    @default("active")
+  /// MNT/сар — энэ хэрэглэгчийн сар тутмын төлбөр
+  planAmount     Float     @default(0)
+  /// Төлбөрийг сүүлд хүлээн авсан огноо
+  paidAt         DateTime?
   createdAt      DateTime  @default(now())
 
   accounts   Account[]
   sessions   Session[]
   statements Statement[]
+  issues     Issue[]
+}
+
+model Issue {
+  id          String    @id @default(cuid())
+  userId      String
+  /// "bug" | "feature" | "question" | "other"
+  type        String
+  title       String
+  description String
+  /// "new" | "in_progress" | "resolved" | "wont_fix"
+  status      String    @default("new")
+  adminNote   String?
+  createdAt   DateTime  @default(now())
+  resolvedAt  DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([status])
+  @@index([createdAt])
 }
 
 model Account {
