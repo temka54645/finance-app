@@ -1,91 +1,157 @@
 "use client";
 
-import { useEffect } from "react";
-import { X, ExternalLink } from "lucide-react";
-import MonthDetailContent from "./MonthDetailContent";
+import { useEffect, useState, useCallback } from "react";
+import { X, Loader2 } from "lucide-react";
+import SummaryCards from "./SummaryCards";
+import UncategorizedSection from "./UncategorizedSection";
+import TransactionTable from "./TransactionTable";
 
-const MONTH_NAMES = [
-  "1-р сар", "2-р сар", "3-р сар", "4-р сар", "5-р сар", "6-р сар",
-  "7-р сар", "8-р сар", "9-р сар", "10-р сар", "11-р сар", "12-р сар",
-];
+interface Highlight { amount: number; count: number }
+
+interface Report {
+  totalIncome: number;
+  totalExpense: number;
+  balance: number;
+  incomeCount: number;
+  expenseCount: number;
+  uncategorizedCount: number;
+  highlights: {
+    bankFees: Highlight;
+    salaryPaid: Highlight;
+    taxes: Highlight;
+    salaryReceived: Highlight;
+  };
+}
+
+interface Transaction {
+  id: string;
+  date: string;
+  description: string;
+  amount: number;
+  type: string;
+  category: string;
+  note?: string | null;
+  statement?: { fileName: string; bankName?: string | null };
+}
 
 interface Props {
-  open: boolean;
   year: number;
   month: number;
   onClose: () => void;
-  onChange: () => void;
+  onUpdate: () => void;
 }
 
-export default function MonthDetailDrawer({ open, year, month, onClose, onChange }: Props) {
-  // ESC дарж хаах
+const MONTH_NAMES = [
+  "1-р сар","2-р сар","3-р сар","4-р сар","5-р сар","6-р сар",
+  "7-р сар","8-р сар","9-р сар","10-р сар","11-р сар","12-р сар",
+];
+
+export default function MonthDetailDrawer({ year, month, onClose, onUpdate }: Props) {
+  const [report, setReport] = useState<Report | null>(null);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [mounted, setMounted] = useState(false);
+
+  const fetchData = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [rRes, tRes] = await Promise.all([
+        fetch(`/api/reports?year=${year}&month=${month}`),
+        fetch(`/api/transactions?year=${year}&month=${month}`),
+      ]);
+      const [rData, tData] = await Promise.all([rRes.json(), tRes.json()]);
+      setReport(rData);
+      setTransactions(tData.transactions ?? []);
+    } finally {
+      setLoading(false);
+    }
+  }, [year, month]);
+
   useEffect(() => {
-    if (!open) return;
+    fetchData();
+    // Trigger slide-in animation
+    requestAnimationFrame(() => setMounted(true));
+  }, [fetchData]);
+
+  // ESC to close
+  useEffect(() => {
     const onEsc = (e: KeyboardEvent) => e.key === "Escape" && onClose();
     document.addEventListener("keydown", onEsc);
     return () => document.removeEventListener("keydown", onEsc);
-  }, [open, onClose]);
+  }, [onClose]);
 
-  // Scroll lock
-  useEffect(() => {
-    if (open) {
-      document.body.style.overflow = "hidden";
-      return () => { document.body.style.overflow = ""; };
-    }
-  }, [open]);
+  const handleUpdate = () => {
+    fetchData();
+    onUpdate();
+  };
 
   return (
     <>
+      {/* Backdrop */}
       <div
         onClick={onClose}
-        className={`fixed inset-0 bg-black/40 z-40 transition-opacity duration-300 motion-reduce:transition-none ${
-          open ? "opacity-100" : "opacity-0 pointer-events-none"
+        className={`fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-40 transition-opacity duration-300 motion-reduce:transition-none ${
+          mounted ? "opacity-100" : "opacity-0"
         }`}
       />
 
-      <aside
-        className={`fixed top-0 right-0 h-full w-full sm:w-[720px] bg-white shadow-2xl z-50 flex flex-col transition-transform duration-300 ease-out motion-reduce:transition-none ${
-          open ? "translate-x-0" : "translate-x-full"
+      {/* Drawer panel */}
+      <div
+        className={`fixed right-0 top-0 h-full w-full max-w-2xl bg-slate-50 z-50 shadow-2xl shadow-slate-900/20 flex flex-col transition-transform duration-300 motion-reduce:transition-none ${
+          mounted ? "translate-x-0" : "translate-x-full"
         }`}
       >
-        <header className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+        {/* Drawer header */}
+        <div className="flex items-center justify-between border-b border-slate-200 bg-white px-6 py-4 flex-shrink-0">
           <div>
-            <p className="text-xs text-gray-400 uppercase">Дэлгэрэнгүй</p>
-            <h2 className="text-lg font-bold text-gray-900">
-              {year} он · {MONTH_NAMES[month - 1]}
+            <p className="text-xs uppercase tracking-wider text-slate-400">Дэлгэрэнгүй</p>
+            <h2 className="text-lg font-semibold text-slate-900">
+              {year} оны {MONTH_NAMES[month - 1]}
             </h2>
           </div>
-          <div className="flex items-center gap-1">
-            <a
-              href={`/y/${year}/${month}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-              title="Шинэ цонхонд бүтэн дэлгэцээр нээх"
-            >
-              <ExternalLink className="w-4 h-4" />
-              <span className="hidden sm:inline">Шинэ цонх</span>
-            </a>
-            <button
-              onClick={onClose}
-              className="p-2 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
-              aria-label="Хаах"
-            >
-              <X className="w-5 h-5" />
-            </button>
-          </div>
-        </header>
+          <button
+            onClick={onClose}
+            className="rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors"
+            aria-label="Хаах"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
 
-        <div className="flex-1 overflow-y-auto px-6 py-5">
-          {open && (
-            <MonthDetailContent
-              year={year}
-              month={month}
-              onExternalChange={onChange}
-            />
+        {/* Drawer content */}
+        <div className="flex-1 overflow-y-auto px-6 py-6 space-y-6">
+          {loading ? (
+            <div className="flex items-center justify-center py-20">
+              <Loader2 className="h-8 w-8 text-blue-500 animate-spin" />
+            </div>
+          ) : (
+            <>
+              {report && (
+                <SummaryCards
+                  totalIncome={report.totalIncome}
+                  totalExpense={report.totalExpense}
+                  balance={report.balance}
+                  incomeCount={report.incomeCount}
+                  expenseCount={report.expenseCount}
+                />
+              )}
+
+              {report && report.uncategorizedCount > 0 && (
+                <UncategorizedSection
+                  statementId=""
+                  count={report.uncategorizedCount}
+                  onUpdate={handleUpdate}
+                />
+              )}
+
+              <TransactionTable
+                transactions={transactions}
+                onUpdate={handleUpdate}
+              />
+            </>
           )}
         </div>
-      </aside>
+      </div>
     </>
   );
 }

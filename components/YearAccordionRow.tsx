@@ -1,93 +1,96 @@
 "use client";
 
-import { ChevronRight } from "lucide-react";
+import { ChevronDown } from "lucide-react";
 import MonthRow from "./MonthRow";
 
-interface Month {
+interface MonthData {
   month: number;
   income: number;
   expense: number;
   txCount: number;
 }
 
-interface Props {
+interface YearData {
   year: number;
   totalIncome: number;
   totalExpense: number;
   balance: number;
   txCount: number;
-  months: Month[];
-  expanded: boolean;
-  onToggle: () => void;
-  onUploadSuccess: () => void;
+  months: MonthData[];
 }
 
-function fmt(n: number): string {
+interface Props {
+  data: YearData;
+  isOpen: boolean;
+  onToggle: () => void;
+  onOpenDetail: (year: number, month: number) => void;
+  onUploaded: () => void;
+}
+
+function fmt(n: number) {
   return n.toLocaleString("mn-MN", { maximumFractionDigits: 0 }) + "₮";
 }
 
-export default function YearAccordionRow({
-  year, totalIncome, totalExpense, balance, txCount, months,
-  expanded, onToggle, onUploadSuccess,
-}: Props) {
+export default function YearAccordionRow({ data, isOpen, onToggle, onOpenDetail, onUploaded }: Props) {
   return (
-    <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-shadow">
+    <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
       {/* Year header */}
       <button
         onClick={onToggle}
-        className="w-full flex items-center gap-4 px-5 py-4 hover:bg-gray-50 transition-colors"
+        className="w-full flex items-center gap-4 px-5 py-4 text-left hover:bg-slate-50 transition-colors"
       >
-        <ChevronRight
-          className={`w-5 h-5 text-gray-400 transition-transform ${expanded ? "rotate-90" : ""}`}
+        <ChevronDown
+          className={`h-5 w-5 text-slate-400 flex-shrink-0 transition-transform duration-300 motion-reduce:transition-none ${
+            isOpen ? "rotate-0" : "-rotate-90"
+          }`}
         />
-        <div className="flex-1 text-left">
-          <h2 className="text-lg font-bold text-gray-900">{year} он</h2>
-          <p className="text-xs text-gray-400">{txCount} нийт гүйлгээ</p>
-        </div>
-        <div className="hidden sm:flex items-center gap-6">
-          <div className="text-right">
-            <p className="text-[10px] uppercase text-gray-400 font-medium">Орлого</p>
-            <p className="text-sm font-bold text-green-600 tabular-nums">+{fmt(totalIncome)}</p>
-          </div>
-          <div className="text-right">
-            <p className="text-[10px] uppercase text-gray-400 font-medium">Зарлага</p>
-            <p className="text-sm font-bold text-red-600 tabular-nums">−{fmt(totalExpense)}</p>
-          </div>
-          <div className="text-right">
-            <p className="text-[10px] uppercase text-gray-400 font-medium">Үлдэгдэл</p>
-            <p className={`text-sm font-bold tabular-nums ${balance >= 0 ? "text-blue-600" : "text-orange-600"}`}>
-              {balance >= 0 ? "+" : ""}{fmt(balance)}
-            </p>
-          </div>
+
+        <span className="text-base font-semibold text-slate-900 w-16 flex-shrink-0">
+          {data.year}
+        </span>
+
+        <span className="text-xs text-slate-400 flex-shrink-0">{data.txCount} гүйлгээ</span>
+
+        <div className="flex items-center gap-3 ml-auto flex-wrap justify-end">
+          <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-200">
+            +{fmt(data.totalIncome)}
+          </span>
+          <span className="inline-flex items-center gap-1 rounded-full bg-rose-50 px-3 py-1 text-xs font-semibold text-rose-700 ring-1 ring-rose-200">
+            −{fmt(data.totalExpense)}
+          </span>
+          <span className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-semibold ring-1 ${
+            data.balance >= 0
+              ? "bg-blue-50 text-blue-700 ring-blue-200"
+              : "bg-orange-50 text-orange-700 ring-orange-200"
+          }`}>
+            ⚖ {data.balance >= 0 ? "+" : "−"}{fmt(Math.abs(data.balance))}
+          </span>
         </div>
       </button>
 
-      {/* Mobile stats (below header) */}
-      <div className="sm:hidden flex items-center justify-around px-4 pb-3 -mt-2 text-xs">
-        <span className="text-green-600 font-semibold">+{fmt(totalIncome)}</span>
-        <span className="text-red-600 font-semibold">−{fmt(totalExpense)}</span>
-        <span className={`font-semibold ${balance >= 0 ? "text-blue-600" : "text-orange-600"}`}>
-          ⚖ {fmt(balance)}
-        </span>
-      </div>
-
-      {/* Months (accordion body — grid trick for animated height) */}
+      {/* Animated body using grid trick */}
       <div
-        className={`grid transition-all duration-300 ease-in-out motion-reduce:transition-none ${
-          expanded ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
-        }`}
+        className="grid transition-all duration-300 motion-reduce:transition-none"
+        style={{ gridTemplateRows: isOpen ? "1fr" : "0fr" }}
       >
         <div className="overflow-hidden">
-          <div className="border-t border-gray-100 px-2 py-2 bg-gray-50/50 space-y-0.5">
-            {months.map(m => (
+          <div className="border-t border-slate-100 px-2 py-2 space-y-0.5">
+            {/* Column headers */}
+            <div className="flex items-center gap-3 px-4 py-1 text-xs uppercase tracking-wide text-slate-400 font-medium">
+              <span className="w-20 flex-shrink-0">Сар</span>
+              <span className="w-32 text-right">Орлого</span>
+              <span className="w-32 text-right">Зарлага</span>
+              <span className="flex-1 text-right">Баланс</span>
+              <span className="w-16 text-right"></span>
+              <span className="w-16 flex-shrink-0"></span>
+            </div>
+            {data.months.map(m => (
               <MonthRow
                 key={m.month}
-                year={year}
-                month={m.month}
-                income={m.income}
-                expense={m.expense}
-                txCount={m.txCount}
-                onUploadSuccess={onUploadSuccess}
+                year={data.year}
+                data={m}
+                onOpenDetail={onOpenDetail}
+                onUploaded={onUploaded}
               />
             ))}
           </div>

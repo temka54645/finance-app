@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Loader2, Calendar } from "lucide-react";
+import { Loader2, Upload } from "lucide-react";
 import YearAccordionRow from "./YearAccordionRow";
+import MonthDetailDrawer from "./MonthDetailDrawer";
 import FileUpload from "./FileUpload";
 
 interface MonthData {
@@ -31,6 +32,8 @@ export default function YearTimeline({ onChange }: Props) {
   const [expandedYears, setExpandedYears] = useState<Set<number>>(
     () => new Set([new Date().getFullYear()])
   );
+  const [detailMonth, setDetailMonth] = useState<{ year: number; month: number } | null>(null);
+  const [uploadModalOpen, setUploadModalOpen] = useState(false);
 
   const fetchTimeline = useCallback(async () => {
     setLoading(true);
@@ -38,26 +41,16 @@ export default function YearTimeline({ onChange }: Props) {
       const res = await fetch("/api/timeline");
       const data = await res.json();
       setTimeline(data.timeline ?? []);
-      if (data.timeline && data.timeline.length > 0) {
-        setExpandedYears(prev => {
-          const next = new Set(prev);
-          next.add(data.timeline[0].year);
-          return next;
-        });
-      }
     } finally {
       setLoading(false);
     }
   }, []);
 
-  useEffect(() => { fetchTimeline(); }, [fetchTimeline]);
-
-  const handleRefetch = useCallback(() => {
+  useEffect(() => {
     fetchTimeline();
-    onChange();
-  }, [fetchTimeline, onChange]);
+  }, [fetchTimeline]);
 
-  const toggleYear = (year: number) => {
+  const handleToggleYear = (year: number) => {
     setExpandedYears(prev => {
       const next = new Set(prev);
       if (next.has(year)) next.delete(year);
@@ -66,49 +59,70 @@ export default function YearTimeline({ onChange }: Props) {
     });
   };
 
-  if (loading && timeline.length === 0) {
+  const handleUploaded = () => {
+    fetchTimeline();
+    onChange();
+  };
+
+  const handleUploadSuccess = () => {
+    setUploadModalOpen(false);
+    fetchTimeline();
+    onChange();
+  };
+
+  if (loading) {
     return (
-      <div className="flex items-center justify-center py-20 text-gray-400">
-        <Loader2 className="w-6 h-6 animate-spin" />
+      <div className="flex items-center justify-center py-16">
+        <Loader2 className="h-6 w-6 text-blue-500 animate-spin" />
       </div>
     );
   }
 
   if (timeline.length === 0) {
     return (
-      <div className="bg-white border border-gray-200 rounded-xl p-8 text-center">
-        <div className="w-12 h-12 mx-auto mb-3 bg-blue-100 rounded-full flex items-center justify-center">
-          <Calendar className="w-6 h-6 text-blue-600" />
-        </div>
-        <h3 className="text-lg font-semibold text-gray-900 mb-1">
-          Эхний statement-ээ оруулна уу
-        </h3>
-        <p className="text-sm text-gray-500 mb-6">
-          Банкны хуулга оруулсны дараа жил жилээр гүйлгээ нь энд харагдана.
-        </p>
-        <div className="max-w-sm mx-auto">
-          <FileUpload onSuccess={handleRefetch} />
-        </div>
+      <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-10 text-center">
+        <p className="text-slate-500 text-sm font-medium mb-1">Гүйлгээний мэдээлэл байхгүй байна</p>
+        <p className="text-slate-400 text-xs mb-6">Эхний statement-ээ оруулаад эхлээрэй</p>
+        {uploadModalOpen ? (
+          <div className="max-w-sm mx-auto">
+            <FileUpload onSuccess={handleUploadSuccess} />
+          </div>
+        ) : (
+          <button
+            onClick={() => setUploadModalOpen(true)}
+            className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-blue-500 to-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-blue-500/30 hover:brightness-110 transition-all"
+          >
+            <Upload className="h-4 w-4" />
+            Файл оруулах
+          </button>
+        )}
       </div>
     );
   }
 
   return (
-    <div className="space-y-3">
-      {timeline.map(y => (
-        <YearAccordionRow
-          key={y.year}
-          year={y.year}
-          totalIncome={y.totalIncome}
-          totalExpense={y.totalExpense}
-          balance={y.balance}
-          txCount={y.txCount}
-          months={y.months}
-          expanded={expandedYears.has(y.year)}
-          onToggle={() => toggleYear(y.year)}
-          onUploadSuccess={handleRefetch}
+    <>
+      <div className="space-y-3">
+        {timeline.map(yr => (
+          <YearAccordionRow
+            key={yr.year}
+            data={yr}
+            isOpen={expandedYears.has(yr.year)}
+            onToggle={() => handleToggleYear(yr.year)}
+            onOpenDetail={(year, month) => setDetailMonth({ year, month })}
+            onUploaded={handleUploaded}
+          />
+        ))}
+      </div>
+
+      {detailMonth && (
+        <MonthDetailDrawer
+          year={detailMonth.year}
+          month={detailMonth.month}
+          onClose={() => setDetailMonth(null)}
+          onUpdate={handleUploaded}
         />
-      ))}
-    </div>
+      )}
+    </>
   );
 }
