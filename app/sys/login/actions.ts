@@ -53,3 +53,38 @@ export async function adminLoginAction(formData: FormData): Promise<AdminLoginRe
 export async function adminSignOutAction() {
   await signOut({ redirect: false });
 }
+
+export type AdminGoogleResult =
+  | { ok: true; email: string }
+  | { ok: false; error: string };
+
+/**
+ * /sys/login дээрх Google товч нь шууд OAuth flow руу яаралтай биш —
+ * эхлээд server side оруулсан email нь admin role-той эсэхийг шалгана.
+ *
+ * Энэ нь random duryn hun /sys/login URL-ийг олж аваад Google товч дарж
+ * аккаунт үүсгэх боломжгүй болгодог.
+ */
+export async function adminGoogleSigninAction(formData: FormData): Promise<AdminGoogleResult> {
+  const email = String(formData.get("email") ?? "").toLowerCase().trim();
+  if (!email) return { ok: false, error: "Имэйл шаардлагатай" };
+
+  // Pre-check: уг хэрэглэгч одоо DB-д admin байгаа эсэхийг шалгана
+  const user = await prisma.user.findUnique({
+    where: { email },
+    select: { role: true, emailVerified: true },
+  });
+
+  if (!user) {
+    return { ok: false, error: "Энэ имэйл системд бүртгэлгүй байна" };
+  }
+  if (user.role !== "admin") {
+    return { ok: false, error: "Энэ имэйл нь админ эрхгүй байна" };
+  }
+  if (!user.emailVerified) {
+    return { ok: false, error: "Имэйлийг баталгаажуулна уу" };
+  }
+
+  // Бүх шалгалт амжилттай — client side signIn("google") руу буцаана
+  return { ok: true, email };
+}
