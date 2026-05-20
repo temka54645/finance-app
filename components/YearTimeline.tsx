@@ -5,11 +5,19 @@ import { Loader2, Upload } from "lucide-react";
 import YearAccordionRow from "./YearAccordionRow";
 import FileUpload from "./FileUpload";
 
+interface BankData {
+  bankName: string | null;
+  income: number;
+  expense: number;
+  txCount: number;
+}
+
 interface MonthData {
   month: number;
   income: number;
   expense: number;
   txCount: number;
+  banks?: BankData[];
 }
 
 interface YearData {
@@ -18,6 +26,7 @@ interface YearData {
   totalExpense: number;
   balance: number;
   txCount: number;
+  banks?: string[];
   months: MonthData[];
 }
 

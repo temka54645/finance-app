@@ -5,26 +5,38 @@ import { requireUserId, UnauthorizedError } from "@/lib/auth-helpers";
 interface Row {
   year: number;
   month: number;
+  bank_name: string | null;
   type: string;
   total: number;
   tx_count: number;
 }
 
-interface MonthBucket {
-  month: number;
+export interface BankBucket {
+  bankName: string | null;   // null = тодорхойгүй банк
   income: number;
   expense: number;
   txCount: number;
 }
 
-interface YearBucket {
+export interface MonthBucket {
+  month: number;
+  income: number;
+  expense: number;
+  txCount: number;
+  banks: BankBucket[];       // тухайн сард гүйлгээтэй банкууд
+}
+
+export interface YearBucket {
   year: number;
   totalIncome: number;
   totalExpense: number;
   balance: number;
   txCount: number;
+  banks: string[];           // тухайн жилд гүйлгээтэй банкуудын unique жагсаалт
   months: MonthBucket[];
 }
+
+const UNKNOWN = "__unknown__";
 
 export async function GET() {
   try {
@@ -34,26 +46,33 @@ export async function GET() {
       SELECT
         EXTRACT(YEAR FROM t."date")::int AS year,
         EXTRACT(MONTH FROM t."date")::int AS month,
-        t."type" AS type,
-        SUM(t."amount")::float AS total,
-        COUNT(*)::int AS tx_count
+        s."bankName"                     AS bank_name,
+        t."type"                         AS type,
+        SUM(t."amount")::float           AS total,
+        COUNT(*)::int                    AS tx_count
       FROM "Transaction" t
       JOIN "Statement" s ON s."id" = t."statementId"
       WHERE s."userId" = ${userId}
-      GROUP BY 1, 2, 3
+      GROUP BY 1, 2, 3, 4
       ORDER BY 1 DESC, 2
     `;
 
-    // Жил тус бүрд 12 саруудыг pad хийнэ
+    // Жил → Сар → Банк нэстэн map
     const yearsMap = new Map<number, YearBucket>();
+    // Year-level unique bank set
+    const yearBankSet = new Map<number, Set<string>>();
+    // Month-level bank map
+    const monthBankMap = new Map<string, Map<string, BankBucket>>(); // key: `${year}-${month}`
 
     for (const r of rows) {
+      // Жилийн bucket
       if (!yearsMap.has(r.year)) {
         const months: MonthBucket[] = Array.from({ length: 12 }, (_, i) => ({
           month: i + 1,
           income: 0,
           expense: 0,
           txCount: 0,
+          banks: [],
         }));
         yearsMap.set(r.year, {
           year: r.year,
@@ -61,13 +80,16 @@ export async function GET() {
           totalExpense: 0,
           balance: 0,
           txCount: 0,
+          banks: [],
           months,
         });
+        yearBankSet.set(r.year, new Set());
       }
 
       const yearBucket = yearsMap.get(r.year)!;
       const monthBucket = yearBucket.months[r.month - 1];
 
+      // Year/Month aggregates
       if (r.type === "income") {
         monthBucket.income += r.total;
         yearBucket.totalIncome += r.total;
@@ -77,6 +99,47 @@ export async function GET() {
       }
       monthBucket.txCount += r.tx_count;
       yearBucket.txCount += r.tx_count;
+
+      // Bank-level: month-аар нэгтгэх
+      const monthKey = `${r.year}-${r.month}`;
+      if (!monthBankMap.has(monthKey)) monthBankMap.set(monthKey, new Map());
+      const banksForMonth = monthBankMap.get(monthKey)!;
+      const bankKey = r.bank_name ?? UNKNOWN;
+      if (!banksForMonth.has(bankKey)) {
+        banksForMonth.set(bankKey, {
+          bankName: r.bank_name,
+          income: 0,
+          expense: 0,
+          txCount: 0,
+        });
+      }
+      const bankBucket = banksForMonth.get(bankKey)!;
+      if (r.type === "income") bankBucket.income += r.total;
+      else if (r.type === "expense") bankBucket.expense += r.total;
+      bankBucket.txCount += r.tx_count;
+
+      // Year-level unique bank list
+      yearBankSet.get(r.year)!.add(bankKey);
+    }
+
+    // Bank-уудыг month bucket-руу нэмж, sort хийнэ
+    for (const [monthKey, banks] of monthBankMap) {
+      const [yearStr, monthStr] = monthKey.split("-");
+      const yr = Number(yearStr);
+      const mo = Number(monthStr);
+      const sorted = Array.from(banks.values()).sort(
+        (a, b) => (b.income + b.expense) - (a.income + a.expense)
+      );
+      const monthBucket = yearsMap.get(yr)?.months[mo - 1];
+      if (monthBucket) monthBucket.banks = sorted;
+    }
+
+    // Year-level bank жагсаалтыг тогтоох (UNKNOWN-г "" гэж хадгална)
+    for (const [yr, bankSet] of yearBankSet) {
+      const yearBucket = yearsMap.get(yr);
+      if (yearBucket) {
+        yearBucket.banks = Array.from(bankSet).map(k => k === UNKNOWN ? "" : k);
+      }
     }
 
     const timeline = Array.from(yearsMap.values())

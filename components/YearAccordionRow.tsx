@@ -2,12 +2,21 @@
 
 import { ChevronDown } from "lucide-react";
 import MonthRow from "./MonthRow";
+import BankBadge from "./BankBadge";
+
+interface BankData {
+  bankName: string | null;
+  income: number;
+  expense: number;
+  txCount: number;
+}
 
 interface MonthData {
   month: number;
   income: number;
   expense: number;
   txCount: number;
+  banks?: BankData[];
 }
 
 interface YearData {
@@ -16,6 +25,7 @@ interface YearData {
   totalExpense: number;
   balance: number;
   txCount: number;
+  banks?: string[];
   months: MonthData[];
 }
 
@@ -49,6 +59,18 @@ export default function YearAccordionRow({ data, isOpen, onToggle }: Props) {
 
         <span className="text-xs text-slate-400 flex-shrink-0">{data.txCount} гүйлгээ</span>
 
+        {/* Бүх банкны мини-badge — энэ жилд гүйлгээтэй банкууд */}
+        {data.banks && data.banks.length > 0 && (
+          <div className="hidden md:flex items-center gap-1 flex-shrink-0">
+            {data.banks.slice(0, 5).map((b, i) => (
+              <BankBadge key={i} bankName={b || null} size="sm" />
+            ))}
+            {data.banks.length > 5 && (
+              <span className="text-[10px] text-slate-400 font-medium">+{data.banks.length - 5}</span>
+            )}
+          </div>
+        )}
+
         <div className="flex items-center gap-3 ml-auto flex-wrap justify-end">
           <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-200">
             +{fmt(data.totalIncome)}
@@ -79,7 +101,8 @@ export default function YearAccordionRow({ data, isOpen, onToggle }: Props) {
               <span className="w-32 text-right">Орлого</span>
               <span className="w-32 text-right">Зарлага</span>
               <span className="flex-1 text-right">Баланс</span>
-              <span className="w-20 text-right"></span>
+              <span className="w-20 text-right">Гүйлгээ</span>
+              <span className="hidden lg:block w-40 flex-shrink-0 pl-2">Банк</span>
               <span className="w-8 flex-shrink-0"></span>
             </div>
             {data.months.map(m => (

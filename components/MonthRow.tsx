@@ -2,12 +2,21 @@
 
 import Link from "next/link";
 import { ExternalLink } from "lucide-react";
+import BankBadge from "./BankBadge";
+
+interface BankData {
+  bankName: string | null;
+  income: number;
+  expense: number;
+  txCount: number;
+}
 
 interface MonthData {
   month: number;
   income: number;
   expense: number;
   txCount: number;
+  banks?: BankData[];
 }
 
 interface Props {
@@ -28,6 +37,7 @@ function fmt(n: number) {
 export default function MonthRow({ year, data }: Props) {
   const hasData = data.txCount > 0;
   const balance = data.income - data.expense;
+  const banks = data.banks ?? [];
 
   const row = (
     <>
@@ -50,11 +60,19 @@ export default function MonthRow({ year, data }: Props) {
         {hasData ? (balance >= 0 ? "+" : "−") + fmt(Math.abs(balance)) : "—"}
       </span>
 
-      {hasData && (
-        <span className="text-xs text-slate-400 w-20 text-right">
-          {data.txCount} гүйлгээ
-        </span>
-      )}
+      <span className="text-xs text-slate-400 w-20 text-right">
+        {hasData ? `${data.txCount} гүйлгээ` : ""}
+      </span>
+
+      {/* Банкны badge-ууд — энэ сард гүйлгээтэй банкууд */}
+      <span className="hidden lg:flex w-40 flex-shrink-0 pl-2 items-center gap-1 flex-wrap">
+        {banks.slice(0, 3).map((b, i) => (
+          <BankBadge key={i} bankName={b.bankName} size="sm" />
+        ))}
+        {banks.length > 3 && (
+          <span className="text-[10px] text-slate-400 font-medium">+{banks.length - 3}</span>
+        )}
+      </span>
 
       <span className="flex-shrink-0 w-8 flex items-center justify-end">
         {hasData && (
@@ -78,6 +96,7 @@ export default function MonthRow({ year, data }: Props) {
       target="_blank"
       rel="noopener noreferrer"
       className="group flex items-center gap-3 rounded-xl px-4 py-2.5 transition-colors hover:bg-blue-50"
+      title={banks.length > 1 ? `${banks.length} банкны гүйлгээ — дарж дэлгэрэнгүй харна уу` : undefined}
     >
       {row}
     </Link>
