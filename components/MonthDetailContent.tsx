@@ -93,6 +93,8 @@ export default function MonthDetailContent({ year, month, onExternalChange }: Pr
           statementId=""
           count={report.uncategorizedCount}
           onUpdate={handleInternalUpdate}
+          year={year}
+          month={month}
         />
       )}
 

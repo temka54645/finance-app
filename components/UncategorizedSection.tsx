@@ -18,13 +18,16 @@ interface Props {
   statementId: string;
   count: number;
   onUpdate: () => void;
+  /** Year/month filter — байвал тухайн сарын танигдаагүй гүйлгээг л харуулна */
+  year?: number;
+  month?: number;
 }
 
 function fmt(n: number) {
   return n.toLocaleString("mn-MN", { maximumFractionDigits: 0 }) + "₮";
 }
 
-export default function UncategorizedSection({ statementId, count, onUpdate }: Props) {
+export default function UncategorizedSection({ statementId, count, onUpdate, year, month }: Props) {
   const { data: session } = useSession();
   const userType: UserType = ((session?.user as { userType?: string | null } | undefined)?.userType === "business")
     ? "business"
@@ -45,13 +48,16 @@ export default function UncategorizedSection({ statementId, count, onUpdate }: P
     try {
       const params = new URLSearchParams({ uncategorized: "true" });
       if (statementId) params.set("statementId", statementId);
+      // Year/month filter — энэ нь header дээрх count-тай таарч байх ёстой
+      if (typeof year === "number" && !isNaN(year)) params.set("year", String(year));
+      if (typeof month === "number" && !isNaN(month)) params.set("month", String(month));
       const res = await fetch(`/api/transactions?${params}`);
       const data = await res.json();
       setTransactions(data.transactions);
     } finally {
       setLoading(false);
     }
-  }, [statementId]);
+  }, [statementId, year, month]);
 
   useEffect(() => {
     if (expanded) fetchUncategorized();
