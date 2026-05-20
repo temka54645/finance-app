@@ -7,6 +7,7 @@ import TransactionTable from "./TransactionTable";
 import UncategorizedSection from "./UncategorizedSection";
 import CategoryPieChart from "./CategoryPieChart";
 import DailyBarChart from "./DailyBarChart";
+import BankBreakdownCards from "./BankBreakdownCards";
 
 interface Report {
   totalIncome: number;
@@ -83,6 +84,9 @@ export default function MonthDetailContent({ year, month, onExternalChange }: Pr
         incomeCount={report.incomeCount}
         expenseCount={report.expenseCount}
       />
+
+      {/* Хэрэв 2+ банкны гүйлгээ байгаа бол банкаар breakdown харуулна */}
+      <BankBreakdownCards transactions={transactions} />
 
       {report.uncategorizedCount > 0 && (
         <UncategorizedSection

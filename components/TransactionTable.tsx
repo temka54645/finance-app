@@ -2,9 +2,11 @@
 
 import { useState, useMemo } from "react";
 import { useSession } from "next-auth/react";
-import { Pencil, Check, X, Trash2, TrendingUp, TrendingDown, Search, Filter } from "lucide-react";
+import { Pencil, Check, X, Trash2, TrendingUp, TrendingDown, Search, Filter, Landmark } from "lucide-react";
 import { getCategoryStyle } from "@/lib/category-icons";
 import { getIncomeGroups, getExpenseGroups, type UserType } from "@/lib/categories";
+import { getBankMeta } from "@/lib/bankMeta";
+import BankBadge from "./BankBadge";
 
 interface Transaction {
   id: string;
@@ -57,6 +59,22 @@ export default function TransactionTable({ transactions, onUpdate }: Props) {
   const [editData, setEditData] = useState<{ type: string; category: string; note: string }>({ type: "", category: "", note: "" });
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState<TypeFilter>("all");
+  const [bankFilter, setBankFilter] = useState<string>("all"); // bank.shortName or "all"
+
+  // Гүйлгээнүүдээс олдох ялгаатай банкны жагсаалт
+  const bankOptions = useMemo(() => {
+    const map = new Map<string, { key: string; meta: ReturnType<typeof getBankMeta>; count: number }>();
+    for (const t of transactions) {
+      const bn = t.statement?.bankName ?? null;
+      const meta = getBankMeta(bn);
+      const key = bn?.toLowerCase() ?? "unknown";
+      const ex = map.get(key);
+      if (ex) ex.count++;
+      else map.set(key, { key, meta, count: 1 });
+    }
+    return Array.from(map.values()).sort((a, b) => b.count - a.count);
+  }, [transactions]);
+  const showBankFilter = bankOptions.length > 1;
 
   const startEdit = (t: Transaction) => {
     setEditId(t.id);
@@ -94,10 +112,14 @@ export default function TransactionTable({ transactions, onUpdate }: Props) {
   const filtered = useMemo(() => {
     return transactions.filter(t => {
       if (typeFilter !== "all" && t.type !== typeFilter) return false;
+      if (bankFilter !== "all") {
+        const bn = t.statement?.bankName?.toLowerCase() ?? "unknown";
+        if (bn !== bankFilter) return false;
+      }
       if (!matchesSearch(t, search)) return false;
       return true;
     });
-  }, [transactions, typeFilter, search]);
+  }, [transactions, typeFilter, bankFilter, search]);
 
   return (
     <div className="space-y-3">
@@ -139,6 +161,43 @@ export default function TransactionTable({ transactions, onUpdate }: Props) {
         </div>
       </div>
 
+      {/* Bank filter (multiple bank-тай үед л харагдана) */}
+      {showBankFilter && (
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="inline-flex items-center gap-1 text-xs text-slate-500">
+            <Landmark className="h-3 w-3" /> Банк:
+          </span>
+          <button
+            onClick={() => setBankFilter("all")}
+            className={`rounded-full px-2.5 py-0.5 text-xs font-medium transition-colors ring-1 ${
+              bankFilter === "all"
+                ? "bg-slate-900 text-white ring-slate-900"
+                : "bg-white text-slate-600 ring-slate-200 hover:bg-slate-50"
+            }`}
+          >
+            Бүгд · {transactions.length}
+          </button>
+          {bankOptions.map(b => {
+            const active = bankFilter === b.key;
+            return (
+              <button
+                key={b.key}
+                onClick={() => setBankFilter(b.key)}
+                className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium ring-1 transition-all ${
+                  active
+                    ? `${b.meta.className} ring-2`
+                    : `${b.meta.className} opacity-60 hover:opacity-100`
+                }`}
+                title={b.meta.fullName}
+              >
+                <Landmark className="h-3 w-3" />
+                {b.meta.shortName} · {b.count}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
       {/* Status */}
       <div className="text-xs text-slate-500 px-1">
         {filtered.length} / {transactions.length} гүйлгээ
@@ -172,8 +231,10 @@ export default function TransactionTable({ transactions, onUpdate }: Props) {
                   </td>
                   <td className="px-4 py-3 max-w-xs">
                     <p className="truncate text-gray-800">{t.description}</p>
-                    {t.statement?.bankName && (
-                      <p className="text-xs text-gray-400">{t.statement.bankName}</p>
+                    {showBankFilter && (
+                      <div className="mt-1">
+                        <BankBadge bankName={t.statement?.bankName ?? null} size="sm" />
+                      </div>
                     )}
                   </td>
                   <td className="px-4 py-3">
