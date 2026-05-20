@@ -23,15 +23,13 @@ interface Props {
   data: YearData;
   isOpen: boolean;
   onToggle: () => void;
-  onOpenDetail: (year: number, month: number) => void;
-  onUploaded: () => void;
 }
 
 function fmt(n: number) {
   return n.toLocaleString("mn-MN", { maximumFractionDigits: 0 }) + "₮";
 }
 
-export default function YearAccordionRow({ data, isOpen, onToggle, onOpenDetail, onUploaded }: Props) {
+export default function YearAccordionRow({ data, isOpen, onToggle }: Props) {
   return (
     <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
       {/* Year header */}
@@ -81,16 +79,14 @@ export default function YearAccordionRow({ data, isOpen, onToggle, onOpenDetail,
               <span className="w-32 text-right">Орлого</span>
               <span className="w-32 text-right">Зарлага</span>
               <span className="flex-1 text-right">Баланс</span>
-              <span className="w-16 text-right"></span>
-              <span className="w-16 flex-shrink-0"></span>
+              <span className="w-20 text-right"></span>
+              <span className="w-8 flex-shrink-0"></span>
             </div>
             {data.months.map(m => (
               <MonthRow
                 key={m.month}
                 year={data.year}
                 data={m}
-                onOpenDetail={onOpenDetail}
-                onUploaded={onUploaded}
               />
             ))}
           </div>

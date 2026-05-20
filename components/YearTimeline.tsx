@@ -3,7 +3,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { Loader2, Upload } from "lucide-react";
 import YearAccordionRow from "./YearAccordionRow";
-import MonthDetailDrawer from "./MonthDetailDrawer";
 import FileUpload from "./FileUpload";
 
 interface MonthData {
@@ -32,7 +31,6 @@ export default function YearTimeline({ onChange }: Props) {
   const [expandedYears, setExpandedYears] = useState<Set<number>>(
     () => new Set([new Date().getFullYear()])
   );
-  const [detailMonth, setDetailMonth] = useState<{ year: number; month: number } | null>(null);
   const [uploadModalOpen, setUploadModalOpen] = useState(false);
 
   const fetchTimeline = useCallback(async () => {
@@ -57,11 +55,6 @@ export default function YearTimeline({ onChange }: Props) {
       else next.add(year);
       return next;
     });
-  };
-
-  const handleUploaded = () => {
-    fetchTimeline();
-    onChange();
   };
 
   const handleUploadSuccess = () => {
@@ -101,28 +94,15 @@ export default function YearTimeline({ onChange }: Props) {
   }
 
   return (
-    <>
-      <div className="space-y-3">
-        {timeline.map(yr => (
-          <YearAccordionRow
-            key={yr.year}
-            data={yr}
-            isOpen={expandedYears.has(yr.year)}
-            onToggle={() => handleToggleYear(yr.year)}
-            onOpenDetail={(year, month) => setDetailMonth({ year, month })}
-            onUploaded={handleUploaded}
-          />
-        ))}
-      </div>
-
-      {detailMonth && (
-        <MonthDetailDrawer
-          year={detailMonth.year}
-          month={detailMonth.month}
-          onClose={() => setDetailMonth(null)}
-          onUpdate={handleUploaded}
+    <div className="space-y-3">
+      {timeline.map(yr => (
+        <YearAccordionRow
+          key={yr.year}
+          data={yr}
+          isOpen={expandedYears.has(yr.year)}
+          onToggle={() => handleToggleYear(yr.year)}
         />
-      )}
-    </>
+      ))}
+    </div>
   );
 }
