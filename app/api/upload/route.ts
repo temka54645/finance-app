@@ -6,7 +6,7 @@ import { parseCSV, extractRawRows, type ParsedTransaction } from "@/lib/parsers/
 import { parseWithBankDetection } from "@/lib/parsers/banks";
 import { categorizeTransactions } from "@/lib/ai/categorize";
 import { aiExtractTransactions } from "@/lib/ai/extract";
-import { assertWithinLimit, LimitExceededError } from "@/lib/usage";
+import { assertWithinLimit, LimitExceededError, isLimitBypassed } from "@/lib/usage";
 import { getTier } from "@/lib/plans";
 
 export const maxDuration = 120;
@@ -66,8 +66,9 @@ export async function POST(req: NextRequest) {
       ? user.userType
       : "personal";
 
-    // free tier бол AI ашиглахгүй, зөвхөн regex/keyword fallback
-    const allowAi = getTier(user?.plan).limits.aiCategorization;
+    // free tier бол AI ашиглахгүй, зөвхөн regex/keyword fallback.
+    // Beta/тестийн үед bypass хийнэ — бүгдэд AI нээлттэй.
+    const allowAi = isLimitBypassed() || getTier(user?.plan).limits.aiCategorization;
 
     const categorized = await categorizeTransactions(
       parsed.map(t => ({ description: t.description, amount: t.amount })),

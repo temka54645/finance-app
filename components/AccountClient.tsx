@@ -27,6 +27,7 @@ interface UserData {
 interface Props {
   user: UserData;
   usage: MonthlyUsage;
+  betaMode?: boolean;
 }
 
 function fmtDate(iso: string | null) {
@@ -45,7 +46,7 @@ const PAYMENT_LABEL: Record<string, { label: string; color: string }> = {
   cancelled: { label: "Цуцлагдсан",  color: "bg-slate-100 text-slate-700 ring-slate-200" },
 };
 
-export default function AccountClient({ user, usage }: Props) {
+export default function AccountClient({ user, usage, betaMode = false }: Props) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [editingName, setEditingName] = useState(false);
@@ -110,6 +111,18 @@ export default function AccountClient({ user, usage }: Props) {
       </header>
 
       <main className="mx-auto max-w-5xl px-6 py-8 space-y-6">
+        {betaMode && (
+          <div className="rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4 text-sm text-amber-900 flex items-start gap-3">
+            <Sparkles className="h-4 w-4 mt-0.5 text-amber-600 flex-shrink-0" />
+            <div>
+              <p className="font-semibold">Туршилтын үе шат идэвхтэй</p>
+              <p className="mt-0.5 text-xs text-amber-800">
+                Та бүх функцийг хязгааргүй ашиглах боломжтой. Багц сонголт, төлбөр болон хязгаарлалт нь зөвхөн харагдах төдий — бодит блоклолт түр зуур идэвхгүй.
+              </p>
+            </div>
+          </div>
+        )}
+
         {error && (
           <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
             {error}

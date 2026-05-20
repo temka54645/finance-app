@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
-import { getUsageContext } from "@/lib/usage";
+import { getUsageContext, isLimitBypassed } from "@/lib/usage";
 import AccountClient from "@/components/AccountClient";
 
 export const dynamic = "force-dynamic";
@@ -51,6 +51,7 @@ export default async function AccountPage() {
         createdAt: user.createdAt.toISOString(),
       }}
       usage={ctx.usage}
+      betaMode={isLimitBypassed()}
     />
   );
 }

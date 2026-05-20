@@ -6,6 +6,15 @@
 import { prisma } from "@/lib/db";
 import { getTier, type PlanKey } from "@/lib/plans";
 
+/**
+ * BETA_MODE / BYPASS_PLAN_LIMITS флаг идэвхтэй үед бүх plan хязгаар
+ * unblock хийгдэнэ. Production-д энгийн plan-ийн logic-ыг сэргээхдээ
+ * env-ээс утгыг хасна.
+ */
+export function isLimitBypassed(): boolean {
+  return process.env.BYPASS_PLAN_LIMITS === "1" || process.env.BETA_MODE === "1";
+}
+
 export interface MonthlyUsage {
   /** Энэ сард үүссэн гүйлгээний тоо */
   txCount: number;
@@ -108,6 +117,9 @@ export async function assertWithinLimit(
   action: LimitAction,
   projected = 1
 ): Promise<void> {
+  // Beta/тестийн үед бүх limit-ийг алгасна
+  if (isLimitBypassed()) return;
+
   const { tier, usage } = await getUsageContext(userId);
   const limits = tier.limits;
 
