@@ -13,6 +13,8 @@ export interface BankMeta {
   hex: string;
   /** Тоормогцлох keyword-ууд (statement.bankName руу regex test хийнэ) */
   match: RegExp;
+  /** Logo татах ёстой банкны вэб domain */
+  domain?: string;
 }
 
 export const BANKS: BankMeta[] = [
@@ -23,6 +25,7 @@ export const BANKS: BankMeta[] = [
     className: "bg-emerald-50 text-emerald-700 ring-emerald-200",
     hex: "#10b981",
     match: /хаан|khan/i,
+    domain: "khanbank.com",
   },
   {
     id: "tdb",
@@ -31,6 +34,7 @@ export const BANKS: BankMeta[] = [
     className: "bg-teal-50 text-teal-700 ring-teal-200",
     hex: "#14b8a6",
     match: /tdb|худалдаа\s*хөгжлийн/i,
+    domain: "tdbm.mn",
   },
   {
     id: "xac",
@@ -39,6 +43,7 @@ export const BANKS: BankMeta[] = [
     className: "bg-violet-50 text-violet-700 ring-violet-200",
     hex: "#8b5cf6",
     match: /хас|xac/i,
+    domain: "xacbank.mn",
   },
   {
     id: "statebank",
@@ -47,6 +52,7 @@ export const BANKS: BankMeta[] = [
     className: "bg-rose-50 text-rose-700 ring-rose-200",
     hex: "#f43f5e",
     match: /төрийн|state\s*bank/i,
+    domain: "statebank.mn",
   },
   {
     id: "golomt",
@@ -55,6 +61,7 @@ export const BANKS: BankMeta[] = [
     className: "bg-amber-50 text-amber-800 ring-amber-200",
     hex: "#f59e0b",
     match: /голомт|golomt/i,
+    domain: "golomtbank.com",
   },
   {
     id: "capitron",
@@ -63,6 +70,7 @@ export const BANKS: BankMeta[] = [
     className: "bg-sky-50 text-sky-700 ring-sky-200",
     hex: "#0ea5e9",
     match: /capitron|капитрон/i,
+    domain: "capitronbank.com",
   },
   {
     id: "mbank",
@@ -71,8 +79,23 @@ export const BANKS: BankMeta[] = [
     className: "bg-fuchsia-50 text-fuchsia-700 ring-fuchsia-200",
     hex: "#d946ef",
     match: /\bm\s*bank|м\s*банк/i,
+    domain: "mbank.mn",
   },
 ];
+
+/**
+ * Банкны logo URL.
+ * Clearbit илүү чанартай SVG/PNG өгдөг — байхгүй бол Google favicon-руу буцна.
+ */
+export function getBankLogoUrl(domain: string | undefined): string | null {
+  if (!domain) return null;
+  return `https://logo.clearbit.com/${domain}`;
+}
+
+export function getBankFaviconUrl(domain: string | undefined, size = 64): string | null {
+  if (!domain) return null;
+  return `https://www.google.com/s2/favicons?domain=${domain}&sz=${size}`;
+}
 
 /** Тодорхойгүй / танигдаагүй банкны fallback */
 export const UNKNOWN_BANK: BankMeta = {
