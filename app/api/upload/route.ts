@@ -6,6 +6,8 @@ import { parseCSV, extractRawRows, type ParsedTransaction } from "@/lib/parsers/
 import { parseWithBankDetection } from "@/lib/parsers/banks";
 import { categorizeTransactions } from "@/lib/ai/categorize";
 import { aiExtractTransactions } from "@/lib/ai/extract";
+import { assertWithinLimit, LimitExceededError } from "@/lib/usage";
+import { getTier } from "@/lib/plans";
 
 export const maxDuration = 120;
 export const runtime = "nodejs";
@@ -13,6 +15,9 @@ export const runtime = "nodejs";
 export async function POST(req: NextRequest) {
   try {
     const userId = await requireUserId();
+
+    // Plan limit шалгалт — энэ сард багц-аас илүү statement orson эсэх
+    await assertWithinLimit(userId, "upload", 1);
 
     const formData = await req.formData();
     const file = formData.get("file") as File | null;
@@ -52,18 +57,22 @@ export async function POST(req: NextRequest) {
       }, { status: 422 });
     }
 
-    // Хэрэглэгчийн төрлийг авч AI category list-д ашиглана
+    // Хэрэглэгчийн төрөл + plan — AI categorization plan-аар хязгаарлагдсан эсэхийг шалгана
     const user = await prisma.user.findUnique({
       where: { id: userId },
-      select: { userType: true },
+      select: { userType: true, plan: true },
     });
     const userType = (user?.userType === "business" || user?.userType === "personal")
       ? user.userType
       : "personal";
 
+    // free tier бол AI ашиглахгүй, зөвхөн regex/keyword fallback
+    const allowAi = getTier(user?.plan).limits.aiCategorization;
+
     const categorized = await categorizeTransactions(
       parsed.map(t => ({ description: t.description, amount: t.amount })),
-      userType
+      userType,
+      { useAi: allowAi }
     );
 
     const finalBankName = bankNameInput || detectedBank;
@@ -103,6 +112,17 @@ export async function POST(req: NextRequest) {
   } catch (err) {
     if (err instanceof UnauthorizedError) {
       return NextResponse.json({ error: err.message }, { status: 401 });
+    }
+    if (err instanceof LimitExceededError) {
+      return NextResponse.json({
+        error: err.message,
+        code: "LIMIT_EXCEEDED",
+        action: err.action,
+        currentPlan: err.currentPlan,
+        limit: err.limit,
+        used: err.used,
+        upgradeUrl: "/account#billing",
+      }, { status: 402 });
     }
     console.error("[upload] error:", err);
     return NextResponse.json({

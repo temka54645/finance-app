@@ -101,17 +101,23 @@ ${JSON.stringify(batch.map((t, i) => ({ i, desc: t.description, amount: t.amount
   return parsed;
 }
 
+export interface CategorizeOptions {
+  /** AI ашиглах эрх (plan-аас хамаарна). false бол зөвхөн keyword + regex fallback. */
+  useAi?: boolean;
+}
+
 export async function categorizeTransactions(
   transactions: TransactionInput[],
-  userType: UserType = "personal"
+  userType: UserType = "personal",
+  options: CategorizeOptions = { useAi: true }
 ): Promise<CategorizationResult[]> {
   if (transactions.length === 0) return [];
 
   const incomeCats = getIncomeCategoryNames(userType);
   const expenseCats = getExpenseCategoryNames(userType);
 
-  const fallbackIncome = userType === "business" ? "Бусад орлого" : "Бусад орлого";
-  const fallbackExpense = userType === "business" ? "Бусад зарлага" : "Бусад зарлага";
+  const fallbackIncome = "Бусад орлого";
+  const fallbackExpense = "Бусад зарлага";
 
   // Keyword дүрмээр түрүүлж шалгана
   const results: (CategorizationResult | null)[] = transactions.map(t => {
@@ -128,8 +134,18 @@ export async function categorizeTransactions(
     return results as CategorizationResult[];
   }
 
-  const BATCH_SIZE = 30;
   const aiInputs = aiNeededIdx.map(i => transactions[i]);
+
+  // Plan-аас AI хориглосон бол шууд regex fallback хэрэглэнэ
+  if (!options.useAi) {
+    const fallbackResults = fallback(aiInputs, fallbackIncome, fallbackExpense);
+    aiNeededIdx.forEach((origIdx, i) => {
+      results[origIdx] = fallbackResults[i];
+    });
+    return results as CategorizationResult[];
+  }
+
+  const BATCH_SIZE = 30;
   const aiResults: CategorizationResult[] = [];
 
   for (let i = 0; i < aiInputs.length; i += BATCH_SIZE) {

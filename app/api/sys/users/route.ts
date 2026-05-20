@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { requireAdmin, ForbiddenError, AdminUnauthorizedError } from "@/lib/admin";
+import { PLAN_TIERS, type PlanKey } from "@/lib/plans";
 
-const ALLOWED_PLANS = ["free", "pro", "business"] as const;
+const ALLOWED_PLANS = ["free", "small", "medium", "large"] as const;
 const ALLOWED_PAYMENT_STATUSES = ["active", "overdue", "cancelled"] as const;
 const ALLOWED_ROLES = ["user", "admin"] as const;
 
@@ -110,7 +111,11 @@ export async function PATCH(req: NextRequest) {
 
     const data: Record<string, unknown> = {};
     if (role && ALLOWED_ROLES.includes(role as typeof ALLOWED_ROLES[number])) data.role = role;
-    if (plan && ALLOWED_PLANS.includes(plan as typeof ALLOWED_PLANS[number])) data.plan = plan;
+    if (plan && ALLOWED_PLANS.includes(plan as typeof ALLOWED_PLANS[number])) {
+      data.plan = plan;
+      // planAmount-ийг tier-аас автоматаар авна, гэхдээ доор гар тохиргоо override хийж болно
+      data.planAmount = PLAN_TIERS[plan as PlanKey].priceMnt;
+    }
     if (paymentStatus && ALLOWED_PAYMENT_STATUSES.includes(paymentStatus as typeof ALLOWED_PAYMENT_STATUSES[number])) {
       data.paymentStatus = paymentStatus;
     }

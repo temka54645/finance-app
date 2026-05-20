@@ -1,22 +1,30 @@
 "use client";
 
 import { useState, useCallback } from "react";
-import { Upload, FileText, Loader2 } from "lucide-react";
+import Link from "next/link";
+import { Upload, FileText, Loader2, Sparkles } from "lucide-react";
 
 interface Props {
   onSuccess: () => void;
   compact?: boolean;
 }
 
+interface LimitInfo {
+  message: string;
+  upgradeUrl: string;
+}
+
 export default function FileUpload({ onSuccess, compact = false }: Props) {
   const [isDragging, setIsDragging] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [limit, setLimit] = useState<LimitInfo | null>(null);
   const [bankName, setBankName] = useState("");
 
   const upload = useCallback(async (file: File) => {
     setLoading(true);
     setError(null);
+    setLimit(null);
     try {
       const formData = new FormData();
       formData.append("file", file);
@@ -32,11 +40,19 @@ export default function FileUpload({ onSuccess, compact = false }: Props) {
       }
 
       const text = await res.text();
-      let data: { error?: string; count?: number };
+      let data: { error?: string; count?: number; code?: string; upgradeUrl?: string };
       try {
         data = text ? JSON.parse(text) : {};
       } catch {
         throw new Error(`Сервер JSON биш хариу буцаалаа: ${text.slice(0, 200)}`);
+      }
+
+      if (res.status === 402 && data.code === "LIMIT_EXCEEDED") {
+        setLimit({
+          message: data.error ?? "Багцын хязгаар хэтэрсэн",
+          upgradeUrl: data.upgradeUrl ?? "/account#billing",
+        });
+        return;
       }
 
       if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`);
@@ -100,6 +116,20 @@ export default function FileUpload({ onSuccess, compact = false }: Props) {
         <div className={`flex items-start gap-2 text-red-600 bg-red-50 px-3 py-2 rounded-lg ${compact ? "text-xs" : "text-sm"}`}>
           <FileText className={`flex-shrink-0 ${compact ? "w-3 h-3 mt-0.5" : "w-4 h-4"}`} />
           <span className="break-words">{error}</span>
+        </div>
+      )}
+      {limit && (
+        <div className={`flex items-start gap-2 text-amber-800 bg-amber-50 border border-amber-200 px-3 py-2.5 rounded-lg ${compact ? "text-xs" : "text-sm"}`}>
+          <Sparkles className={`flex-shrink-0 text-amber-600 ${compact ? "w-3.5 h-3.5 mt-0.5" : "w-4 h-4 mt-0.5"}`} />
+          <div className="flex-1 min-w-0">
+            <p className="font-medium break-words">{limit.message}</p>
+            <Link
+              href={limit.upgradeUrl}
+              className="mt-1 inline-flex items-center gap-1 font-semibold text-amber-900 underline-offset-2 hover:underline"
+            >
+              Багц шинэчлэх →
+            </Link>
+          </div>
         </div>
       )}
     </div>

@@ -20,7 +20,7 @@ model User {
   userType       String?
   /// "user" | "admin" — admin л /sys/control самбар үзэх эрхтэй
   role           String    @default("user")
-  /// "free" | "pro" | "business" — үйлчилгээний багц
+  /// "free" | "small" | "medium" | "large" — 4-tier багц (lib/plans.ts)
   plan           String    @default("free")
   /// "active" | "overdue" | "cancelled" — төлбөрийн төлөв
   paymentStatus  String    @default("active")
