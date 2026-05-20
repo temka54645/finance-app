@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ExternalLink } from "lucide-react";
+import { ExternalLink, AlertCircle } from "lucide-react";
 import BankBadge from "./BankBadge";
 
 interface BankData {
@@ -16,6 +16,7 @@ interface MonthData {
   income: number;
   expense: number;
   txCount: number;
+  uncategorizedCount?: number;
   banks?: BankData[];
 }
 
@@ -38,11 +39,20 @@ export default function MonthRow({ year, data }: Props) {
   const hasData = data.txCount > 0;
   const balance = data.income - data.expense;
   const banks = data.banks ?? [];
+  const uncategorized = data.uncategorizedCount ?? 0;
 
   const row = (
     <>
-      <span className="w-20 flex-shrink-0 text-sm font-medium text-slate-700">
+      <span className="w-20 flex-shrink-0 text-sm font-medium text-slate-700 flex items-center gap-1.5">
         {MONTH_NAMES[data.month - 1]}
+        {uncategorized > 0 && (
+          <span
+            className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-amber-100 text-amber-700 text-[10px] font-semibold ring-1 ring-amber-300"
+            title={`${uncategorized} тодорхойгүй гүйлгээ`}
+          >
+            {uncategorized}
+          </span>
+        )}
       </span>
 
       <span className={`w-32 text-right text-sm tabular-nums ${hasData && data.income > 0 ? "text-emerald-600 font-medium" : "text-slate-400"}`}>
@@ -90,13 +100,31 @@ export default function MonthRow({ year, data }: Props) {
     );
   }
 
+  const handleClick = () => {
+    // Тухайн нээж буй жилийг sessionStorage-д тэмдэглэнэ — буцаж ирэх үед auto-expand болно
+    try {
+      const raw = window.sessionStorage.getItem("finmate.expandedYears");
+      const set = new Set<number>(raw ? JSON.parse(raw) : []);
+      set.add(year);
+      window.sessionStorage.setItem("finmate.expandedYears", JSON.stringify(Array.from(set)));
+      window.sessionStorage.setItem("finmate.lastViewedYear", String(year));
+    } catch {}
+  };
+
   return (
     <Link
       href={`/y/${year}/${data.month}`}
-      target="_blank"
-      rel="noopener noreferrer"
-      className="group flex items-center gap-3 rounded-xl px-4 py-2.5 transition-colors hover:bg-blue-50"
-      title={banks.length > 1 ? `${banks.length} банкны гүйлгээ — дарж дэлгэрэнгүй харна уу` : undefined}
+      onClick={handleClick}
+      className={`group flex items-center gap-3 rounded-xl px-4 py-2.5 transition-colors hover:bg-blue-50 ${
+        uncategorized > 0 ? "ring-1 ring-amber-200/60 bg-amber-50/30" : ""
+      }`}
+      title={
+        uncategorized > 0
+          ? `${uncategorized} тодорхойгүй гүйлгээ — дарж ангилна уу`
+          : banks.length > 1
+            ? `${banks.length} банкны гүйлгээ — дарж дэлгэрэнгүй харна уу`
+            : undefined
+      }
     >
       {row}
     </Link>

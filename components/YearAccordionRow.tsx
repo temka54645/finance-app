@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, AlertCircle } from "lucide-react";
 import MonthRow from "./MonthRow";
 import BankBadge from "./BankBadge";
 
@@ -16,6 +16,7 @@ interface MonthData {
   income: number;
   expense: number;
   txCount: number;
+  uncategorizedCount?: number;
   banks?: BankData[];
 }
 
@@ -25,6 +26,7 @@ interface YearData {
   totalExpense: number;
   balance: number;
   txCount: number;
+  uncategorizedCount?: number;
   banks?: string[];
   months: MonthData[];
 }
@@ -41,7 +43,7 @@ function fmt(n: number) {
 
 export default function YearAccordionRow({ data, isOpen, onToggle }: Props) {
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+    <div id={`year-${data.year}`} className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden scroll-mt-24">
       {/* Year header */}
       <button
         onClick={onToggle}
@@ -58,6 +60,16 @@ export default function YearAccordionRow({ data, isOpen, onToggle }: Props) {
         </span>
 
         <span className="text-xs text-slate-400 flex-shrink-0">{data.txCount} гүйлгээ</span>
+
+        {data.uncategorizedCount && data.uncategorizedCount > 0 ? (
+          <span
+            className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-700 ring-1 ring-amber-300 flex-shrink-0"
+            title={`${data.uncategorizedCount} тодорхойгүй гүйлгээ — ангилахын тулд саруудаар нь нээ`}
+          >
+            <AlertCircle className="h-3 w-3" />
+            {data.uncategorizedCount} тодорхойгүй
+          </span>
+        ) : null}
 
         {/* Бүх банкны мини-badge — энэ жилд гүйлгээтэй банкууд */}
         {data.banks && data.banks.length > 0 && (

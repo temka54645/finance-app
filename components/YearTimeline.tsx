@@ -17,6 +17,7 @@ interface MonthData {
   income: number;
   expense: number;
   txCount: number;
+  uncategorizedCount?: number;
   banks?: BankData[];
 }
 
@@ -26,6 +27,7 @@ interface YearData {
   totalExpense: number;
   balance: number;
   txCount: number;
+  uncategorizedCount?: number;
   banks?: string[];
   months: MonthData[];
 }
@@ -34,12 +36,31 @@ interface Props {
   onChange: () => void;
 }
 
+const STORAGE_KEY = "finmate.expandedYears";
+
+function loadExpandedYears(): Set<number> {
+  if (typeof window === "undefined") return new Set([new Date().getFullYear()]);
+  try {
+    const raw = window.sessionStorage.getItem(STORAGE_KEY);
+    if (raw) {
+      const arr = JSON.parse(raw);
+      if (Array.isArray(arr)) return new Set(arr.filter((n: unknown) => typeof n === "number"));
+    }
+  } catch {}
+  return new Set([new Date().getFullYear()]);
+}
+
+function saveExpandedYears(set: Set<number>) {
+  if (typeof window === "undefined") return;
+  try {
+    window.sessionStorage.setItem(STORAGE_KEY, JSON.stringify(Array.from(set)));
+  } catch {}
+}
+
 export default function YearTimeline({ onChange }: Props) {
   const [timeline, setTimeline] = useState<YearData[]>([]);
   const [loading, setLoading] = useState(true);
-  const [expandedYears, setExpandedYears] = useState<Set<number>>(
-    () => new Set([new Date().getFullYear()])
-  );
+  const [expandedYears, setExpandedYears] = useState<Set<number>>(loadExpandedYears);
   const [uploadModalOpen, setUploadModalOpen] = useState(false);
 
   const fetchTimeline = useCallback(async () => {
@@ -57,11 +78,27 @@ export default function YearTimeline({ onChange }: Props) {
     fetchTimeline();
   }, [fetchTimeline]);
 
+  // Хэрэглэгч сараас буцаж ирсэн бол тэр жил рүү scroll хийнэ
+  useEffect(() => {
+    if (loading || timeline.length === 0) return;
+    try {
+      const last = window.sessionStorage.getItem("finmate.lastViewedYear");
+      if (last) {
+        const el = document.getElementById(`year-${last}`);
+        if (el) {
+          el.scrollIntoView({ behavior: "smooth", block: "start" });
+        }
+        window.sessionStorage.removeItem("finmate.lastViewedYear");
+      }
+    } catch {}
+  }, [loading, timeline]);
+
   const handleToggleYear = (year: number) => {
     setExpandedYears(prev => {
       const next = new Set(prev);
       if (next.has(year)) next.delete(year);
       else next.add(year);
+      saveExpandedYears(next);
       return next;
     });
   };

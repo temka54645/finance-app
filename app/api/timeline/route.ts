@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { requireUserId, UnauthorizedError } from "@/lib/auth-helpers";
 
+const UNCATEGORIZED = ["Бусад орлого", "Бусад зарлага", "Ангилаагүй"];
+
 interface Row {
   year: number;
   month: number;
@@ -9,6 +11,7 @@ interface Row {
   type: string;
   total: number;
   tx_count: number;
+  uncategorized_count: number;
 }
 
 export interface BankBucket {
@@ -23,6 +26,7 @@ export interface MonthBucket {
   income: number;
   expense: number;
   txCount: number;
+  uncategorizedCount: number;
   banks: BankBucket[];       // тухайн сард гүйлгээтэй банкууд
 }
 
@@ -32,6 +36,7 @@ export interface YearBucket {
   totalExpense: number;
   balance: number;
   txCount: number;
+  uncategorizedCount: number;
   banks: string[];           // тухайн жилд гүйлгээтэй банкуудын unique жагсаалт
   months: MonthBucket[];
 }
@@ -49,7 +54,8 @@ export async function GET() {
         s."bankName"                     AS bank_name,
         t."type"                         AS type,
         SUM(t."amount")::float           AS total,
-        COUNT(*)::int                    AS tx_count
+        COUNT(*)::int                    AS tx_count,
+        SUM(CASE WHEN t."category" = ANY(${UNCATEGORIZED}::text[]) THEN 1 ELSE 0 END)::int AS uncategorized_count
       FROM "Transaction" t
       JOIN "Statement" s ON s."id" = t."statementId"
       WHERE s."userId" = ${userId}
@@ -72,6 +78,7 @@ export async function GET() {
           income: 0,
           expense: 0,
           txCount: 0,
+          uncategorizedCount: 0,
           banks: [],
         }));
         yearsMap.set(r.year, {
@@ -80,6 +87,7 @@ export async function GET() {
           totalExpense: 0,
           balance: 0,
           txCount: 0,
+          uncategorizedCount: 0,
           banks: [],
           months,
         });
@@ -99,6 +107,8 @@ export async function GET() {
       }
       monthBucket.txCount += r.tx_count;
       yearBucket.txCount += r.tx_count;
+      monthBucket.uncategorizedCount += Number(r.uncategorized_count) || 0;
+      yearBucket.uncategorizedCount += Number(r.uncategorized_count) || 0;
 
       // Bank-level: month-аар нэгтгэх
       const monthKey = `${r.year}-${r.month}`;
