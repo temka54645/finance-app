@@ -3,7 +3,7 @@
 import { useMemo } from "react";
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from "recharts";
 import { getCategoryColor } from "@/lib/category-icons";
-import { getIncomeGroups, getExpenseGroups, type UserType } from "@/lib/categories";
+import { getIncomeGroups, getExpenseGroups, getIncomeCategoryNames, getExpenseCategoryNames, type UserType } from "@/lib/categories";
 
 interface CategoryItem {
   category: string;
@@ -36,7 +36,7 @@ export default function CategoryPieChart({
   title,
   userType = "personal",
 }: Props) {
-  // categories.ts-аас icon авна
+  // categories.ts-аас icon авна (зөвхөн тухайн userType-ийн)
   const iconMap = useMemo(() => {
     const groups = type === "income"
       ? getIncomeGroups(userType)
@@ -50,9 +50,44 @@ export default function CategoryPieChart({
     return map;
   }, [type, userType]);
 
+  // Орлого/зарлагын ангиллын бүх боломжит нэр (personal + business хоёулангаас нь)
+  // Энэ нь userType солигдсон ч хуучин гүйлгээнүүдийг зөв шүүхэд хэрэгтэй.
+  const validNamesForThisType = useMemo(() => {
+    const incomeNames = new Set([
+      ...getIncomeCategoryNames("personal"),
+      ...getIncomeCategoryNames("business"),
+      "Бусад орлого",
+    ]);
+    const expenseNames = new Set([
+      ...getExpenseCategoryNames("personal"),
+      ...getExpenseCategoryNames("business"),
+      "Бусад зарлага",
+    ]);
+    return { incomeNames, expenseNames };
+  }, []);
+
   const data = useMemo(() =>
     byCategory
-      .filter(c => c.type === type && (c._sum.amount ?? 0) > 0)
+      .filter(c => {
+        if ((c._sum.amount ?? 0) <= 0) return false;
+        const { incomeNames, expenseNames } = validNamesForThisType;
+        const isKnownIncome = incomeNames.has(c.category);
+        const isKnownExpense = expenseNames.has(c.category);
+
+        if (type === "income") {
+          // Орлогын chart: nameKey нь орлогын нэр байх ёстой
+          // Хэрвээ category нэр нь зарлагынх бол (өгөгдлийн зөрчил) — хасна
+          if (isKnownExpense && !isKnownIncome) return false;
+          // Тодорхой орлогын нэр — оруулна
+          if (isKnownIncome) return true;
+          // "Ангилаагүй" гэх мэт танигдаагүй нэр — type талбараар шалгана
+          return c.type === "income";
+        } else {
+          if (isKnownIncome && !isKnownExpense) return false;
+          if (isKnownExpense) return true;
+          return c.type === "expense";
+        }
+      })
       .map(c => ({
         name: c.category,
         value: c._sum.amount ?? 0,
@@ -61,7 +96,7 @@ export default function CategoryPieChart({
         meta: iconMap[c.category],
       }))
       .sort((a, b) => b.value - a.value),
-  [byCategory, type, iconMap]);
+  [byCategory, type, iconMap, validNamesForThisType]);
 
   const total = useMemo(() => data.reduce((s, d) => s + d.value, 0), [data]);
 
