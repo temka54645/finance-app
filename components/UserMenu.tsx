@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { LogOut, User as UserIcon, ChevronDown, FileText, Tags, Building2 } from "lucide-react";
+import { LogOut, User as UserIcon, ChevronDown, FileText, Tags, Building2, Settings } from "lucide-react";
 import { signOut, useSession } from "next-auth/react";
 
 interface Props {
@@ -54,6 +54,14 @@ export default function UserMenu({ email, name }: Props) {
                 </span>
               )}
             </div>
+            <Link
+              href="/account"
+              onClick={() => setOpen(false)}
+              className="w-full px-3 py-2 text-sm text-left text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+            >
+              <Settings className="w-4 h-4 text-gray-400" />
+              Миний профайл
+            </Link>
             <Link
               href="/categories"
               onClick={() => setOpen(false)}
