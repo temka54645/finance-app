@@ -102,7 +102,7 @@ export default function AdminClient() {
   const [search, setSearch] = useState("");
   const [userTypeFilter, setUserTypeFilter] = useState<"all" | "personal" | "business">("all");
   const [roleFilter, setRoleFilter] = useState<"all" | "user" | "admin">("all");
-  const [planFilter, setPlanFilter] = useState<"all" | "free" | "pro" | "business">("all");
+  const [planFilter, setPlanFilter] = useState<"all" | "free" | "small" | "medium" | "large">("all");
 
   // Issues filters
   const [issueStatusFilter, setIssueStatusFilter] = useState<"all" | "new" | "in_progress" | "resolved" | "wont_fix">("all");
@@ -265,14 +265,15 @@ export default function AdminClient() {
                 </h3>
                 <p className="mt-1 text-xs text-slate-500">Хэрэглэгчдийн plan</p>
                 <div className="mt-5 space-y-3">
-                  {(["free", "pro", "business"] as const).map(p => {
+                  {(["free", "small", "medium", "large"] as const).map(p => {
                     const count = stats?.plans?.[p] ?? 0;
                     const total = stats?.totalUsers ?? 1;
                     const pct = total > 0 ? (count / total) * 100 : 0;
-                    const color = p === "business" ? "from-indigo-500 to-purple-500"
-                      : p === "pro" ? "from-blue-400 to-blue-500"
+                    const color = p === "large" ? "from-indigo-500 to-purple-500"
+                      : p === "medium" ? "from-blue-400 to-blue-500"
+                      : p === "small" ? "from-sky-300 to-sky-400"
                       : "from-slate-300 to-slate-400";
-                    const label = p === "free" ? "Free" : p === "pro" ? "Pro" : "Business";
+                    const label = { free: "Бичил", small: "Жижиг", medium: "Дунд", large: "Том" }[p];
                     return (
                       <div key={p}>
                         <div className="flex items-baseline justify-between">
@@ -458,9 +459,10 @@ export default function AdminClient() {
                   onChange={(v) => setPlanFilter(v as typeof planFilter)}
                   options={[
                     { v: "all", label: "Бүх багц" },
-                    { v: "free", label: "Free" },
-                    { v: "pro", label: "Pro" },
-                    { v: "business", label: "Business" },
+                    { v: "free", label: "Бичил" },
+                    { v: "small", label: "Жижиг" },
+                    { v: "medium", label: "Дунд" },
+                    { v: "large", label: "Том" },
                   ]} />
                 <SelectChip icon={<Filter className="h-3.5 w-3.5" />} value={roleFilter}
                   onChange={(v) => setRoleFilter(v as typeof roleFilter)}
@@ -531,9 +533,10 @@ export default function AdminClient() {
                                 className="text-xs border rounded px-1 py-0.5 w-full"
                                 disabled={isSaving}
                               >
-                                <option value="free">Free</option>
-                                <option value="pro">Pro</option>
-                                <option value="business">Business</option>
+                                <option value="free">Бичил (Free)</option>
+                                <option value="small">Жижиг</option>
+                                <option value="medium">Дунд</option>
+                                <option value="large">Том</option>
                               </select>
                               <input
                                 type="number"
