@@ -49,7 +49,17 @@ if (process.env.AUTH_GOOGLE_ID && process.env.AUTH_GOOGLE_SECRET) {
     Google({
       clientId: process.env.AUTH_GOOGLE_ID,
       clientSecret: process.env.AUTH_GOOGLE_SECRET,
-      allowDangerousEmailAccountLinking: true,
+      // ⚠ Энэ flag-ийг false-д тавьсан — өмнө нь enabled үед нэг session
+      // дотроос дараагийн Google account-ыг ялгаатай email-тэй ч гэсэн
+      // одоогийн хэрэглэгчрүү буруугаар link хийдэг алдаа байсан.
+      // Зөвхөн email яг таарвал линкждэг (NextAuth default).
+      allowDangerousEmailAccountLinking: false,
+      // Account picker-ийг үргэлж харуулна — auto-pick хийхгүй
+      authorization: {
+        params: {
+          prompt: "select_account",
+        },
+      },
     })
   );
 }
