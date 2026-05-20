@@ -99,11 +99,25 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       }
       return token;
     },
-    session: ({ session, token }) => {
+    session: async ({ session, token }) => {
       if (session.user && token.id) {
         session.user.id = token.id as string;
-        (session.user as { userType?: string | null }).userType = (token.userType as string | null) ?? null;
-        (session.user as { role?: string | null }).role = (token.role as string | null) ?? "user";
+        // userType / role нь DB-д өөрчлөгдсөн ч JWT cookie-д хуучин утгатай үлдэх
+        // асуудлаас сэргийлэх — session callback дотор DB-ээс үргэлж шинэхэн уншина.
+        // Энэ нь session фэтч бүрт нэг индекстэй lookup нэмнэ, гэхдээ
+        // userType-аас хамаарсан category list зэрэг UI зөв ажиллах баталгаа болно.
+        try {
+          const u = await prisma.user.findUnique({
+            where: { id: token.id as string },
+            select: { userType: true, role: true },
+          });
+          (session.user as { userType?: string | null }).userType = u?.userType ?? null;
+          (session.user as { role?: string | null }).role = u?.role ?? "user";
+        } catch {
+          // DB алдаа гарвал JWT-ийн утгад буцна (degraded mode)
+          (session.user as { userType?: string | null }).userType = (token.userType as string | null) ?? null;
+          (session.user as { role?: string | null }).role = (token.role as string | null) ?? "user";
+        }
       }
       return session;
     },

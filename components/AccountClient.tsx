@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
 import {
   ArrowLeft, Building2, User as UserIcon, Mail, Calendar, CreditCard,
   CheckCircle2, AlertTriangle, Pencil, Loader2, Sparkles, Crown, Check,
@@ -48,6 +49,7 @@ const PAYMENT_LABEL: Record<string, { label: string; color: string }> = {
 
 export default function AccountClient({ user, usage, betaMode = false }: Props) {
   const router = useRouter();
+  const { update: updateSession } = useSession();
   const [pending, startTransition] = useTransition();
   const [editingName, setEditingName] = useState(false);
   const [name, setName] = useState(user.name ?? "");
@@ -87,7 +89,9 @@ export default function AccountClient({ user, usage, betaMode = false }: Props) 
         });
         if (!res.ok) throw new Error((await res.json()).error ?? "Алдаа");
         setShowTypeModal(false);
-        // Session refresh shаардлагатай — full reload
+        // JWT-д хадгалагдсан userType-ыг DB-аас шинэчлэх
+        await updateSession();
+        // Full reload — серверийн компонент болон бүх client cache шинэчлэгдэнэ
         window.location.reload();
       } catch (e) {
         setError(e instanceof Error ? e.message : "Алдаа");
