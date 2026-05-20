@@ -1,6 +1,13 @@
 import * as XLSX from "xlsx";
 import type { ParsedTransaction } from "../excel";
 
+interface StatementMeta {
+  periodStart?: Date;
+  periodEnd?: Date;
+  openingBalance?: number;
+  closingBalance?: number;
+}
+
 /**
  * Төрийн банкны (State Bank) statement parser.
  *
@@ -107,4 +114,57 @@ export function parseStateBank(buffer: Buffer): ParsedTransaction[] {
   }
 
   return results;
+}
+
+/**
+ * Төрийн банкны хуулгын metadata.
+ *  - Тус тусын row-д "Үлдэгдэл" running balance байгаа учир хуулгын
+ *    closingBalance = сүүлчийн tx-ийн үлдэгдэл
+ *  - Opening balance-ийг тооцох: эхний tx-ийн үлдэгдэл − (income − expense)
+ *  - Period = огнооны min/max
+ */
+export function extractStateBankMeta(buffer: Buffer): StatementMeta {
+  const workbook = XLSX.read(buffer, { type: "buffer", cellDates: true });
+  const sheetName = workbook.SheetNames.find(n => n === "Statements") ?? workbook.SheetNames[0];
+  const sheet = workbook.Sheets[sheetName];
+  const rows = XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1, defval: "" });
+
+  const meta: StatementMeta = {};
+
+  let minDate: Date | null = null;
+  let maxDate: Date | null = null;
+  let firstDataRow: unknown[] | null = null;
+  let lastDataRow: unknown[] | null = null;
+
+  for (let i = 1; i < rows.length; i++) {
+    const row = rows[i];
+    const date = parseStateBankDate(row[COL.date], row[COL.time]);
+    if (!date) continue;
+    if (!minDate || date < minDate) {
+      minDate = date;
+      firstDataRow = row;
+    }
+    if (!maxDate || date > maxDate) {
+      maxDate = date;
+      lastDataRow = row;
+    }
+  }
+
+  if (minDate) meta.periodStart = minDate;
+  if (maxDate) meta.periodEnd = maxDate;
+
+  if (lastDataRow) {
+    const bal = toNumber(lastDataRow[COL.balance]);
+    if (!isNaN(bal)) meta.closingBalance = bal;
+  }
+  if (firstDataRow) {
+    const bal = toNumber(firstDataRow[COL.balance]);
+    const income = toNumber(firstDataRow[COL.income]);
+    const expense = toNumber(firstDataRow[COL.expense]);
+    // running balance нь tx-ийн ДАРАА бүртгэгддэг → opening = balance − (income − expense)
+    const opening = bal - (income - expense);
+    if (!isNaN(opening)) meta.openingBalance = opening;
+  }
+
+  return meta;
 }

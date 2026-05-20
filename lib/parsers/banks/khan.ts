@@ -1,5 +1,13 @@
 import * as XLSX from "xlsx";
 import type { ParsedTransaction } from "../excel";
+import { findLabeledValue, parseDateRange } from "./metaHelpers";
+
+interface StatementMeta {
+  periodStart?: Date;
+  periodEnd?: Date;
+  openingBalance?: number;
+  closingBalance?: number;
+}
 
 /**
  * ХААН банкны (Khan Bank) Excel statement parser.
@@ -110,4 +118,65 @@ export function parseKhanBank(buffer: Buffer): ParsedTransaction[] {
   }
 
   return results;
+}
+
+/**
+ * Khan хуулгын metadata.
+ *  - "Интервал: YYYY-MM-DD-YYYY-MM-DD" cell-аас period
+ *  - Эхний (data row) col 2 "Эхний үлдэгдэл" → openingBalance
+ *  - Сүүлчийн (data row) col 5 "Эцсийн үлдэгдэл" → closingBalance
+ */
+export function extractKhanMeta(buffer: Buffer): StatementMeta {
+  const workbook = XLSX.read(buffer, { type: "buffer", cellDates: true });
+  const sheetName = workbook.SheetNames.find(n => /deposit.*statement|хуулга/i.test(n))
+    ?? workbook.SheetNames[0];
+  const sheet = workbook.Sheets[sheetName];
+  const rows = XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1, defval: "" });
+
+  const meta: StatementMeta = {};
+
+  // Period — "Интервал: ..." cell-аас
+  const periodStr = findLabeledValue(rows, /интервал/i, 10);
+  if (periodStr) {
+    const { start, end } = parseDateRange(periodStr);
+    if (start) meta.periodStart = start;
+    if (end) meta.periodEnd = end;
+  }
+
+  // Header мөрийг ол
+  let headerIdx = -1;
+  for (let i = 0; i < Math.min(rows.length, 20); i++) {
+    const row = rows[i];
+    if (
+      row.some(c => typeof c === "string" && /гүйлгээний огноо/i.test(c)) &&
+      row.some(c => typeof c === "string" && /кредит гүйлгээ/i.test(c))
+    ) {
+      headerIdx = i;
+      break;
+    }
+  }
+  if (headerIdx < 0) return meta;
+
+  // First data row → openingBalance = col 2 (Эхний үлдэгдэл)
+  // Last data row → closingBalance = col 5 (Эцсийн үлдэгдэл)
+  let firstDataIdx = -1;
+  let lastDataIdx = -1;
+  for (let i = headerIdx + 1; i < rows.length; i++) {
+    const row = rows[i];
+    // Огноо нь "2026-03-01 ..." форматтай үед л data row
+    if (typeof row[0] === "string" && /^\d{4}-\d{1,2}-\d{1,2}/.test(row[0])) {
+      if (firstDataIdx < 0) firstDataIdx = i;
+      lastDataIdx = i;
+    }
+  }
+  if (firstDataIdx >= 0) {
+    const open = Number(rows[firstDataIdx][2]);
+    if (!isNaN(open)) meta.openingBalance = open;
+  }
+  if (lastDataIdx >= 0) {
+    const close = Number(rows[lastDataIdx][5]);
+    if (!isNaN(close)) meta.closingBalance = close;
+  }
+
+  return meta;
 }

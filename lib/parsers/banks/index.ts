@@ -1,7 +1,7 @@
 import { XAC_BANK, parseXacBank, extractXacMeta } from "./xac";
-import { TDB_BANK, parseTdbBank } from "./tdb";
-import { STATE_BANK, parseStateBank } from "./statebank";
-import { KHAN_BANK, parseKhanBank } from "./khan";
+import { TDB_BANK, parseTdbBank, extractTdbMeta } from "./tdb";
+import { STATE_BANK, parseStateBank, extractStateBankMeta } from "./statebank";
+import { KHAN_BANK, parseKhanBank, extractKhanMeta } from "./khan";
 import { parseExcel, extractRawRows, type ParsedTransaction } from "../excel";
 
 export interface StatementMeta {
@@ -26,10 +26,10 @@ export interface BankTemplate {
 
 // Бүртгэгдсэн банкны template-ууд
 const BANK_TEMPLATES: BankTemplate[] = [
-  { ...XAC_BANK, parse: parseXacBank, extractMeta: extractXacMeta },
-  { ...TDB_BANK, parse: parseTdbBank },
-  { ...STATE_BANK, parse: parseStateBank },
-  { ...KHAN_BANK, parse: parseKhanBank },
+  { ...XAC_BANK,       parse: parseXacBank,       extractMeta: extractXacMeta       },
+  { ...TDB_BANK,       parse: parseTdbBank,       extractMeta: extractTdbMeta       },
+  { ...STATE_BANK,     parse: parseStateBank,     extractMeta: extractStateBankMeta },
+  { ...KHAN_BANK,      parse: parseKhanBank,      extractMeta: extractKhanMeta      },
   // Цаашид Golomt, Capitron гэх мэт нэмж болно
 ];
 
