@@ -30,6 +30,23 @@ interface Stats {
   mrr: number;
   openIssues: number;
   issueStatusCounts: Record<string, number>;
+  revenueByTier: {
+    plan: string;
+    label: string;
+    priceMnt: number;
+    payingUsers: number;
+    revenue: number;
+  }[];
+  topPayingUsers: {
+    id: string;
+    email: string;
+    name: string | null;
+    plan: string;
+    planLabel: string;
+    planAmount: number;
+    paidAt: string | null;
+  }[];
+  monthlyRevenue: { month: string; revenue: number; payingUsers: number }[];
 }
 
 interface AdminUser {
@@ -317,6 +334,93 @@ export default function AdminClient() {
                 )}
               </section>
             </div>
+
+            {/* ─── ОРЛОГЫН ЗАДАРГАА (Revenue breakdown) ─── */}
+            <section className="rounded-2xl border border-slate-200 bg-white/90 p-6 shadow-sm backdrop-blur">
+              <div className="mb-5 flex items-end justify-between">
+                <div>
+                  <h3 className="text-sm font-semibold uppercase tracking-wider text-slate-700">
+                    Системийн орлогын задаргаа
+                  </h3>
+                  <p className="mt-1 text-xs text-slate-500">
+                    Багц тус бүрийн төлбөртэй хэрэглэгчид, MRR хувь нэмэр
+                  </p>
+                </div>
+                <DollarSign className="h-4 w-4 text-slate-400" />
+              </div>
+
+              {/* Revenue by tier grid */}
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 mb-6">
+                {(stats?.revenueByTier ?? []).map(t => (
+                  <div key={t.plan} className="rounded-xl border border-slate-200 p-4 bg-gradient-to-br from-white to-slate-50">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">{t.label}</span>
+                      <span className="text-xs text-slate-400">{fmt(t.priceMnt)}/сар</span>
+                    </div>
+                    <p className="text-2xl font-bold tabular-nums text-slate-900">{fmt(t.revenue)}</p>
+                    <p className="mt-1 text-xs text-slate-500">{fmtNum(t.payingUsers)} төлбөртэй</p>
+                  </div>
+                ))}
+              </div>
+
+              {/* Monthly trend */}
+              <div className="rounded-xl bg-slate-50 p-4 mb-6">
+                <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  Сүүлийн 6 сарын орлогын чиглэл
+                </p>
+                {!stats || stats.monthlyRevenue.length === 0 ? (
+                  <p className="py-4 text-center text-sm text-slate-400">Мэдээлэл байхгүй</p>
+                ) : (
+                  <RevenueBars data={stats.monthlyRevenue} />
+                )}
+              </div>
+
+              {/* Top paying users */}
+              <div>
+                <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  Шилдэг 10 төлбөртэй хэрэглэгч
+                </p>
+                {!stats || stats.topPayingUsers.length === 0 ? (
+                  <p className="py-4 text-center text-sm text-slate-400">Мэдээлэл байхгүй</p>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full text-sm">
+                      <thead className="text-xs uppercase tracking-wide text-slate-400">
+                        <tr className="border-b border-slate-100">
+                          <th className="py-2 text-left font-medium">Хэрэглэгч</th>
+                          <th className="py-2 text-left font-medium">Багц</th>
+                          <th className="py-2 text-right font-medium">Сар тутмын</th>
+                          <th className="py-2 text-right font-medium">Сүүлд төлсөн</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {stats.topPayingUsers.map(u => (
+                          <tr key={u.id}>
+                            <td className="py-2 pr-2">
+                              <p className="font-medium text-slate-900 truncate max-w-[200px]">
+                                {u.name || u.email.split("@")[0]}
+                              </p>
+                              <p className="text-xs text-slate-500 truncate max-w-[200px]">{u.email}</p>
+                            </td>
+                            <td className="py-2 pr-2">
+                              <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700 ring-1 ring-blue-200">
+                                {u.planLabel}
+                              </span>
+                            </td>
+                            <td className="py-2 pr-2 text-right tabular-nums font-medium text-slate-900">
+                              {fmt(u.planAmount)}
+                            </td>
+                            <td className="py-2 text-right text-xs text-slate-500">
+                              {u.paidAt ? new Date(u.paidAt).toLocaleDateString("mn-MN") : "—"}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            </section>
           </>
         )}
 
@@ -648,20 +752,55 @@ function StatCard({ label, value, sub, icon, accent }: {
   );
 }
 
+function RevenueBars({ data }: { data: { month: string; revenue: number; payingUsers: number }[] }) {
+  const max = Math.max(...data.map(d => d.revenue), 1);
+  return (
+    <div className="flex items-end gap-2 h-32">
+      {data.map(d => {
+        const h = Math.max((d.revenue / max) * 100, 2);
+        const monthLabel = d.month.slice(5); // "YYYY-MM" -> "MM"
+        return (
+          <div key={d.month} className="flex-1 flex flex-col items-center gap-1 min-w-0" title={`${d.month}: ${fmt(d.revenue)} (${d.payingUsers} хэрэглэгч)`}>
+            <div className="text-xs tabular-nums text-slate-600 font-medium truncate">{fmt(d.revenue)}</div>
+            <div className="w-full bg-gradient-to-t from-blue-600 to-blue-400 rounded-t" style={{ height: `${h}%` }} />
+            <div className="text-xs text-slate-500">{monthLabel}</div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 function PlanBadge({ plan }: { plan: string }) {
-  if (plan === "business") return (
+  // 4-tier шинэ: free/small/medium/large + legacy pro/business
+  const labels: Record<string, string> = {
+    free: "Бичил",
+    small: "Жижиг",
+    medium: "Дунд",
+    large: "Том",
+    pro: "Pro (legacy)",
+    business: "Business (legacy)",
+  };
+  const label = labels[plan] ?? plan;
+
+  if (plan === "large" || plan === "business") return (
     <span className="inline-flex items-center gap-1 rounded-full bg-gradient-to-r from-indigo-500 to-purple-600 px-2 py-0.5 text-xs font-semibold text-white">
-      <Crown className="h-3 w-3" /> Business
+      <Crown className="h-3 w-3" /> {label}
     </span>
   );
-  if (plan === "pro") return (
-    <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700">
-      Pro
+  if (plan === "medium" || plan === "pro") return (
+    <span className="inline-flex items-center gap-1 rounded-full bg-indigo-50 px-2 py-0.5 text-xs font-semibold text-indigo-700 ring-1 ring-indigo-200">
+      {label}
+    </span>
+  );
+  if (plan === "small") return (
+    <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700 ring-1 ring-blue-200">
+      {label}
     </span>
   );
   return (
     <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-700">
-      Free
+      {label}
     </span>
   );
 }
