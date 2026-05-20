@@ -11,11 +11,8 @@ import UncategorizedSection from "@/components/UncategorizedSection";
 import YearTimeline from "@/components/YearTimeline";
 import UserMenu from "@/components/UserMenu";
 import FeedbackButton from "@/components/FeedbackButton";
-import CategoryPieChart from "@/components/CategoryPieChart";
-import MonthlyChart from "@/components/MonthlyChart";
 
 interface Highlight { amount: number; count: number }
-interface CategoryItem { category: string; type: string; _sum: { amount: number }; _count: number }
 
 interface OverviewReport {
   totalIncome: number;
@@ -30,10 +27,6 @@ interface OverviewReport {
     salaryReceived: Highlight;
   };
   uncategorizedCount: number;
-  byCategory: CategoryItem[];
-  availableYears: number[];
-  yearly: { year: number; income: number; expense: number }[];
-  monthly: { month: number; income: number; expense: number }[];
 }
 
 export default function DashboardClient() {
@@ -41,41 +34,18 @@ export default function DashboardClient() {
   const [overview, setOverview] = useState<OverviewReport | null>(null);
   const [loading, setLoading] = useState(false);
   const [uploadModalOpen, setUploadModalOpen] = useState(false);
-  const [selectedYear, setSelectedYear] = useState<number | null>(null);
-  const [monthlyData, setMonthlyData] = useState<{ month: number; income: number; expense: number }[]>([]);
-  const [monthlyLoading, setMonthlyLoading] = useState(false);
-
   const fetchOverview = useCallback(async () => {
     setLoading(true);
     try {
       const res = await fetch("/api/reports");
       const data = await res.json();
       setOverview(data);
-      // Хамгийн сүүлийн жилийг default сонгоно (зөвхөн анх нэг удаа)
-      if (data.availableYears?.length > 0) {
-        setSelectedYear(prev => prev ?? data.availableYears[0]);
-      }
     } finally {
       setLoading(false);
     }
   }, []);
 
-  const fetchMonthly = useCallback(async (year: number) => {
-    setMonthlyLoading(true);
-    try {
-      const res = await fetch(`/api/reports?year=${year}`);
-      const data = await res.json();
-      setMonthlyData(data.monthly ?? []);
-    } finally {
-      setMonthlyLoading(false);
-    }
-  }, []);
-
   useEffect(() => { fetchOverview(); }, [fetchOverview]);
-
-  useEffect(() => {
-    if (selectedYear) fetchMonthly(selectedYear);
-  }, [selectedYear, fetchMonthly]);
 
   useEffect(() => {
     if (!uploadModalOpen) return;
@@ -90,7 +60,6 @@ export default function DashboardClient() {
   };
 
   const displayName = session?.user?.name || session?.user?.email?.split("@")[0] || "хэрэглэгч";
-  const userType = (session?.user as { userType?: string } | undefined)?.userType === "business" ? "business" : "personal";
   const hasData = overview && overview.incomeCount + overview.expenseCount > 0;
 
   return (
@@ -179,68 +148,6 @@ export default function DashboardClient() {
             taxes={overview.highlights.taxes}
             salaryReceived={overview.highlights.salaryReceived}
           />
-        )}
-
-        {/* Charts section */}
-        {hasData && overview && (
-          <section className="space-y-4">
-            <div>
-              <h3 className="text-sm font-semibold uppercase tracking-wider text-slate-700">
-                Ангиллын задаргаа
-              </h3>
-              <p className="mt-1 text-xs text-slate-500">Нийт оруулсан бүх өгөгдөл дээр суурилсан</p>
-            </div>
-
-            {/* Pie charts */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <CategoryPieChart
-                byCategory={overview.byCategory}
-                type="income"
-                title="Орлогын ангилал"
-                userType={userType}
-              />
-              <CategoryPieChart
-                byCategory={overview.byCategory}
-                type="expense"
-                title="Зарлагын ангилал"
-                userType={userType}
-              />
-            </div>
-
-            {/* Bar chart — сарын динамик */}
-            {overview.availableYears.length > 0 && (
-              <div>
-                {/* Year tabs */}
-                <div className="flex items-center gap-1 mb-3 flex-wrap">
-                  <span className="text-xs text-slate-500 mr-2">Жил сонгох:</span>
-                  {overview.availableYears.map(yr => (
-                    <button
-                      key={yr}
-                      onClick={() => setSelectedYear(yr)}
-                      className={`px-3 py-1 rounded-lg text-xs font-semibold transition-colors ${
-                        selectedYear === yr
-                          ? "bg-blue-600 text-white"
-                          : "bg-white border border-slate-200 text-slate-600 hover:border-blue-400 hover:text-blue-600"
-                      }`}
-                    >
-                      {yr}
-                    </button>
-                  ))}
-                </div>
-
-                {selectedYear && (
-                  <div className="relative">
-                    {monthlyLoading && (
-                      <div className="absolute inset-0 bg-white/70 rounded-xl flex items-center justify-center z-10">
-                        <div className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
-                      </div>
-                    )}
-                    <MonthlyChart year={selectedYear} monthly={monthlyData} />
-                  </div>
-                )}
-              </div>
-            )}
-          </section>
         )}
 
         {/* Uncategorized alert */}
