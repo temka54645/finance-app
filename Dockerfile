@@ -57,5 +57,6 @@ COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 USER nextjs
 EXPOSE 3000
 
-# `node_modules/.bin/prisma` нь npm install-аас shim үүсгэгдсэн тул шууд хэрэглэнэ
-CMD ["sh","-c","./node_modules/.bin/prisma migrate deploy && node server.js"]
+# prisma migrate deploy: шинэ migration-ийг автоматаар ажиллуулна.
+# node_modules/.bin/prisma нь prod-deps-аас суулгагдсан shim.
+CMD ["sh","-c","node node_modules/.bin/prisma migrate deploy && node server.js"]
