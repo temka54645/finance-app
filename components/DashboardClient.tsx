@@ -90,6 +90,7 @@ export default function DashboardClient() {
   };
 
   const displayName = session?.user?.name || session?.user?.email?.split("@")[0] || "хэрэглэгч";
+  const userType = (session?.user as { userType?: string } | undefined)?.userType === "business" ? "business" : "personal";
   const hasData = overview && overview.incomeCount + overview.expenseCount > 0;
 
   return (
@@ -196,11 +197,13 @@ export default function DashboardClient() {
                 byCategory={overview.byCategory}
                 type="income"
                 title="Орлогын ангилал"
+                userType={userType}
               />
               <CategoryPieChart
                 byCategory={overview.byCategory}
                 type="expense"
                 title="Зарлагын ангилал"
+                userType={userType}
               />
             </div>
 
