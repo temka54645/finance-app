@@ -1,6 +1,15 @@
 import * as XLSX from "xlsx";
 import type { ParsedTransaction } from "../excel";
 
+// Note: StatementMeta-г import хийхийн оронд дотооддоо тодорхойлсон —
+// xac.ts ⇄ index.ts хооронд circular import гарахаас сэргийлэх.
+interface StatementMeta {
+  periodStart?: Date;
+  periodEnd?: Date;
+  openingBalance?: number;
+  closingBalance?: number;
+}
+
 export const XAC_BANK = {
   id: "xac",
   name: "Хас банк (XacBank)",
@@ -64,4 +73,66 @@ export function parseXacBank(buffer: Buffer): ParsedTransaction[] {
   }
 
   return results;
+}
+
+const MONTHS_3LETTER: Record<string, number> = {
+  jan: 0, feb: 1, mar: 2, apr: 3, may: 4, jun: 5,
+  jul: 6, aug: 7, sep: 8, oct: 9, nov: 10, dec: 11,
+};
+
+/**
+ * "01/Jul/2021-30/Sep/2021" гэх мэт интервал-аас periodStart/periodEnd-ийг гаргана.
+ */
+function parsePeriodRange(text: string): { start?: Date; end?: Date } {
+  const m = text.match(/(\d{1,2})\/([A-Za-z]{3})\/(\d{4})\s*[-–—]\s*(\d{1,2})\/([A-Za-z]{3})\/(\d{4})/);
+  if (!m) return {};
+  const [, d1, mo1, y1, d2, mo2, y2] = m;
+  const m1 = MONTHS_3LETTER[mo1.toLowerCase()];
+  const m2 = MONTHS_3LETTER[mo2.toLowerCase()];
+  if (m1 === undefined || m2 === undefined) return {};
+  return {
+    start: new Date(Date.UTC(Number(y1), m1, Number(d1))),
+    end: new Date(Date.UTC(Number(y2), m2, Number(d2), 23, 59, 59)),
+  };
+}
+
+/**
+ * XAC хуулгын metadata (period, opening/closing balance) гаргана.
+ */
+export function extractXacMeta(buffer: Buffer): StatementMeta {
+  const workbook = XLSX.read(buffer, { type: "buffer", cellDates: true });
+  const sheet = workbook.Sheets[workbook.SheetNames[0]];
+  const rows = XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1, defval: "" });
+
+  const meta: StatementMeta = {};
+
+  // Period interval — "Хугацаа :" гэсэн label-ын дараах cell-ээс
+  for (let i = 0; i < Math.min(rows.length, 15); i++) {
+    const row = rows[i];
+    for (let j = 0; j < row.length; j++) {
+      const cell = row[j];
+      if (typeof cell === "string" && /хугацаа\s*:/i.test(cell)) {
+        const next = row[j + 1];
+        if (typeof next === "string") {
+          const { start, end } = parsePeriodRange(next);
+          if (start) meta.periodStart = start;
+          if (end) meta.periodEnd = end;
+        }
+      }
+    }
+  }
+
+  // Opening / Closing — "Эхний үлдэгдэл" / "Эцсийн үлдэгдэл" мөрөөс col 6 (Үлдэгдэл)
+  for (const row of rows) {
+    const utga = String(row[3] ?? "").trim();
+    if (utga === "Эхний үлдэгдэл") {
+      const val = Number(row[6]);
+      if (!isNaN(val)) meta.openingBalance = val;
+    } else if (utga === "Эцсийн үлдэгдэл") {
+      const val = Number(row[6]);
+      if (!isNaN(val)) meta.closingBalance = val;
+    }
+  }
+
+  return meta;
 }

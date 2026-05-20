@@ -23,6 +23,7 @@ interface QueueItem {
   message?: string;
   count?: number;
   detectedBank?: string | null;
+  gapWarning?: string | null;
 }
 
 const ACCEPT = ".pdf,.xlsx,.xls,.csv";
@@ -76,6 +77,7 @@ export default function FileUpload({ onSuccess, compact = false }: Props) {
               detectedBank?: string | null;
               code?: string;
               upgradeUrl?: string;
+              gapWarning?: { message: string } | null;
             } = {};
             try {
               data = text ? JSON.parse(text) : {};
@@ -111,6 +113,7 @@ export default function FileUpload({ onSuccess, compact = false }: Props) {
                       status: "done",
                       count: data.count ?? 0,
                       detectedBank: data.detectedBank ?? null,
+                      gapWarning: data.gapWarning?.message ?? null,
                     }
                   : q
               )
@@ -242,9 +245,11 @@ export default function FileUpload({ onSuccess, compact = false }: Props) {
             {queue.map(item => (
               <li
                 key={item.id}
-                className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs border transition-colors ${
+                className={`px-2.5 py-1.5 rounded-lg text-xs border transition-colors ${
                   item.status === "done"
-                    ? "border-emerald-200 bg-emerald-50"
+                    ? item.gapWarning
+                      ? "border-amber-300 bg-amber-50"
+                      : "border-emerald-200 bg-emerald-50"
                     : item.status === "error"
                       ? "border-rose-200 bg-rose-50"
                       : item.status === "limit"
@@ -254,25 +259,33 @@ export default function FileUpload({ onSuccess, compact = false }: Props) {
                           : "border-slate-200 bg-slate-50"
                 }`}
               >
-                <StatusIcon status={item.status} />
-                <div className="min-w-0 flex-1">
-                  <p className="truncate font-medium text-slate-800">{item.file.name}</p>
-                  <p className="text-[10px] text-slate-500 truncate">
-                    {fmtBytes(item.file.size)}
-                    {item.status === "done" && item.count !== undefined && (
-                      <>
-                        {" · "}
-                        <span className="text-emerald-700 font-medium">{item.count} гүйлгээ</span>
-                        {item.detectedBank && <> · <span className="text-slate-600">{item.detectedBank}</span></>}
-                      </>
-                    )}
-                    {item.status === "uploading" && " · Боловсруулж байна..."}
-                    {item.status === "pending" && " · Хүлээгдэж байна"}
-                    {(item.status === "error" || item.status === "limit") && item.message && (
-                      <> · <span className={item.status === "error" ? "text-rose-700" : "text-amber-700"}>{item.message}</span></>
-                    )}
-                  </p>
+                <div className="flex items-center gap-2">
+                  <StatusIcon status={item.status} />
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate font-medium text-slate-800">{item.file.name}</p>
+                    <p className="text-[10px] text-slate-500 truncate">
+                      {fmtBytes(item.file.size)}
+                      {item.status === "done" && item.count !== undefined && (
+                        <>
+                          {" · "}
+                          <span className="text-emerald-700 font-medium">{item.count} гүйлгээ</span>
+                          {item.detectedBank && <> · <span className="text-slate-600">{item.detectedBank}</span></>}
+                        </>
+                      )}
+                      {item.status === "uploading" && " · Боловсруулж байна..."}
+                      {item.status === "pending" && " · Хүлээгдэж байна"}
+                      {(item.status === "error" || item.status === "limit") && item.message && (
+                        <> · <span className={item.status === "error" ? "text-rose-700" : "text-amber-700"}>{item.message}</span></>
+                      )}
+                    </p>
+                  </div>
                 </div>
+                {item.gapWarning && (
+                  <div className="mt-1.5 flex items-start gap-1.5 rounded-md border border-amber-200 bg-amber-100/60 px-2 py-1.5 text-[11px] leading-snug text-amber-900 animate-fade-in">
+                    <Sparkles className="h-3 w-3 flex-shrink-0 mt-0.5 text-amber-600" />
+                    <span className="break-words">{item.gapWarning}</span>
+                  </div>
+                )}
               </li>
             ))}
           </ul>

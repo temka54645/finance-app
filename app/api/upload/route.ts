@@ -3,7 +3,7 @@ import { prisma } from "@/lib/db";
 import { requireUserId, UnauthorizedError } from "@/lib/auth-helpers";
 import { parsePDF } from "@/lib/parsers/pdf";
 import { parseCSV, extractRawRows, type ParsedTransaction } from "@/lib/parsers/excel";
-import { parseWithBankDetection } from "@/lib/parsers/banks";
+import { parseWithBankDetection, type StatementMeta } from "@/lib/parsers/banks";
 import { categorizeTransactions } from "@/lib/ai/categorize";
 import { aiExtractTransactions } from "@/lib/ai/extract";
 import { assertWithinLimit, LimitExceededError, isLimitBypassed } from "@/lib/usage";
@@ -33,6 +33,7 @@ export async function POST(req: NextRequest) {
 
     let parsed: ParsedTransaction[] = [];
     let detectedBank: string | null = null;
+    let stmtMeta: StatementMeta | undefined = undefined;
 
     if (ext === "pdf") {
       parsed = await parsePDF(buffer);
@@ -42,6 +43,7 @@ export async function POST(req: NextRequest) {
       const result = parseWithBankDetection(buffer);
       parsed = result.transactions;
       detectedBank = result.detectedBank;
+      stmtMeta = result.meta;
     } else {
       return NextResponse.json({ error: "Дэмжигдэхгүй файлын төрөл" }, { status: 400 });
     }
@@ -83,6 +85,10 @@ export async function POST(req: NextRequest) {
         userId,
         fileName,
         bankName: finalBankName || null,
+        periodStart: stmtMeta?.periodStart ?? null,
+        periodEnd: stmtMeta?.periodEnd ?? null,
+        openingBalance: stmtMeta?.openingBalance ?? null,
+        closingBalance: stmtMeta?.closingBalance ?? null,
         transactions: {
           create: parsed.map((t, i) => {
             const cat = categorized[i];
@@ -103,12 +109,68 @@ export async function POST(req: NextRequest) {
       include: { transactions: true },
     });
 
+    // ─── Gap detection ─────────────────────────────────────────────
+    // Энэ хуулгын periodStart-аас өмнө дууссан хамгийн ойрхон хуулгыг
+    // олж, түүний closingBalance vs шинэ openingBalance-ийг харьцуулна.
+    let gapWarning: {
+      message: string;
+      diff: number;
+      priorFile: string;
+      priorPeriodEnd: string | null;
+      priorClosing: number;
+      thisOpening: number;
+    } | null = null;
+
+    if (
+      stmtMeta?.periodStart &&
+      stmtMeta?.openingBalance != null &&
+      Number.isFinite(stmtMeta.openingBalance)
+    ) {
+      const prior = await prisma.statement.findFirst({
+        where: {
+          userId,
+          id: { not: statement.id },
+          periodEnd: { lt: stmtMeta.periodStart, not: null },
+          closingBalance: { not: null },
+        },
+        orderBy: { periodEnd: "desc" },
+        select: {
+          fileName: true,
+          periodEnd: true,
+          closingBalance: true,
+        },
+      });
+
+      if (
+        prior?.closingBalance != null &&
+        Number.isFinite(prior.closingBalance)
+      ) {
+        const diff = stmtMeta.openingBalance - prior.closingBalance;
+        if (Math.abs(diff) > 1) {
+          const fmt = (n: number) => n.toLocaleString("mn-MN", { maximumFractionDigits: 2 }) + "₮";
+          gapWarning = {
+            message: `Анхаарал: Энэ хуулгын эхний үлдэгдэл (${fmt(stmtMeta.openingBalance)}) нь өмнөх хуулгын эцсийн үлдэгдлээс (${fmt(prior.closingBalance)}) ${fmt(Math.abs(diff))}-ээр зөрж байна. Дунд нь оруулаагүй хуулга байж магадгүй.`,
+            diff,
+            priorFile: prior.fileName,
+            priorPeriodEnd: prior.periodEnd ? prior.periodEnd.toISOString() : null,
+            priorClosing: prior.closingBalance,
+            thisOpening: stmtMeta.openingBalance,
+          };
+        }
+      }
+    }
+
     return NextResponse.json({
       statement,
       detectedBank,
       count: statement.transactions.length,
       incomeCount: statement.transactions.filter(t => t.type === "income").length,
       expenseCount: statement.transactions.filter(t => t.type === "expense").length,
+      periodStart: stmtMeta?.periodStart ?? null,
+      periodEnd: stmtMeta?.periodEnd ?? null,
+      openingBalance: stmtMeta?.openingBalance ?? null,
+      closingBalance: stmtMeta?.closingBalance ?? null,
+      gapWarning,
     });
   } catch (err) {
     if (err instanceof UnauthorizedError) {

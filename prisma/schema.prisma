@@ -98,16 +98,25 @@ model VerificationToken {
 // ── App-specific models ────────────────────────────────────────────
 
 model Statement {
-  id           String        @id @default(cuid())
-  userId       String
-  fileName     String
-  bankName     String?
-  uploadedAt   DateTime      @default(now())
+  id              String        @id @default(cuid())
+  userId          String
+  fileName        String
+  bankName        String?
+  uploadedAt      DateTime      @default(now())
+  /// Хуулгын хамрах эхлэл огноо (file metadata-аас)
+  periodStart     DateTime?
+  /// Хуулгын хамрах төгсгөл огноо
+  periodEnd       DateTime?
+  /// Эхний үлдэгдэл (Opening Balance) — gap-detection-д хэрэглэнэ
+  openingBalance  Float?
+  /// Эцсийн үлдэгдэл (Closing Balance)
+  closingBalance  Float?
 
   user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   transactions Transaction[]
 
   @@index([userId])
+  @@index([userId, periodEnd])
 }
 
 model Transaction {
