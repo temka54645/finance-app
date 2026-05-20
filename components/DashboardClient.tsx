@@ -51,14 +51,14 @@ export default function DashboardClient() {
       const res = await fetch("/api/reports");
       const data = await res.json();
       setOverview(data);
-      // Хамгийн сүүлийн жилийг default сонгоно
-      if (data.availableYears?.length > 0 && !selectedYear) {
-        setSelectedYear(data.availableYears[0]);
+      // Хамгийн сүүлийн жилийг default сонгоно (зөвхөн анх нэг удаа)
+      if (data.availableYears?.length > 0) {
+        setSelectedYear(prev => prev ?? data.availableYears[0]);
       }
     } finally {
       setLoading(false);
     }
-  }, [selectedYear]);
+  }, []);
 
   const fetchMonthly = useCallback(async (year: number) => {
     setMonthlyLoading(true);
@@ -71,11 +71,11 @@ export default function DashboardClient() {
     }
   }, []);
 
+  useEffect(() => { fetchOverview(); }, [fetchOverview]);
+
   useEffect(() => {
     if (selectedYear) fetchMonthly(selectedYear);
   }, [selectedYear, fetchMonthly]);
-
-  useEffect(() => { fetchOverview(); }, [fetchOverview]);
 
   useEffect(() => {
     if (!uploadModalOpen) return;
