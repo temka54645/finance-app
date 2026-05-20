@@ -44,7 +44,7 @@ export async function GET(req: NextRequest) {
       where.date = yearRange(year);
     }
 
-    const [incomeAgg, expenseAgg, byCategory, statements, uncategorizedCount, availableYearsRaw] = await Promise.all([
+    const [incomeAgg, expenseAgg, byCategory, statements, uncategorizedCount, availableYearsRaw, yearlyRaw] = await Promise.all([
       prisma.transaction.aggregate({ where: { ...where, type: "income" }, _sum: { amount: true }, _count: true }),
       prisma.transaction.aggregate({ where: { ...where, type: "expense" }, _sum: { amount: true }, _count: true }),
       prisma.transaction.groupBy({ by: ["category", "type"], where, _sum: { amount: true }, _count: true }),
@@ -60,6 +60,17 @@ export async function GET(req: NextRequest) {
         JOIN "Statement" s ON s."id" = t."statementId"
         WHERE s."userId" = ${userId}
         ORDER BY year DESC
+      `,
+      prisma.$queryRaw<{ year: number; type: string; total: number }[]>`
+        SELECT
+          EXTRACT(YEAR FROM t."date")::int AS year,
+          t."type" AS type,
+          SUM(t."amount")::float AS total
+        FROM "Transaction" t
+        JOIN "Statement" s ON s."id" = t."statementId"
+        WHERE s."userId" = ${userId}
+        GROUP BY 1, 2
+        ORDER BY 1
       `,
     ]);
 
@@ -79,6 +90,18 @@ export async function GET(req: NextRequest) {
     };
 
     const availableYears = availableYearsRaw.map(r => r.year);
+
+    // Жил тус бүрийн нийлбэр (bar chart-д)
+    const yearlyMap = new Map<number, { income: number; expense: number }>();
+    for (const row of yearlyRaw) {
+      if (!yearlyMap.has(row.year)) yearlyMap.set(row.year, { income: 0, expense: 0 });
+      const entry = yearlyMap.get(row.year)!;
+      if (row.type === "income") entry.income = row.total;
+      else if (row.type === "expense") entry.expense = row.total;
+    }
+    const yearly = Array.from(yearlyMap.entries())
+      .sort((a, b) => a[0] - b[0])
+      .map(([yr, v]) => ({ year: yr, income: v.income, expense: v.expense }));
 
     // Сарын aggregation (зөвхөн жил сонгосон, сар сонгоогүй үед)
     let monthly: { month: number; income: number; expense: number }[] = [];
@@ -120,6 +143,7 @@ export async function GET(req: NextRequest) {
       byCategory,
       statements,
       availableYears,
+      yearly,
       year,
       monthly,
     });
