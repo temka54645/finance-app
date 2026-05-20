@@ -6,16 +6,33 @@ export default auth(async (req) => {
   const isLoggedIn = !!req.auth;
 
   // Public routes (no auth required)
-  const publicPaths = ["/login", "/signup", "/api/auth", "/api/health"];
-  const isPublic = publicPaths.some(p => pathname.startsWith(p));
+  const publicPaths = [
+    "/login",
+    "/signup",
+    "/verify-email",        // email баталгаажуулах линк (token-аар)
+    "/sys/login",           // админ-login (тусдаа URL)
+    "/api/auth",
+    "/api/health",
+    "/api/verify-email",    // verify-email page-аас дуудагдана
+  ];
+  const isPublic = publicPaths.some(
+    p => pathname === p || pathname.startsWith(p + "/") || pathname.startsWith(p + "?")
+  );
 
-  // Logged-in user shouldn't see login/signup
-  if (isLoggedIn && (pathname === "/login" || pathname === "/signup")) {
+  // Logged-in user shouldn't see login/signup pages
+  if (
+    isLoggedIn &&
+    (pathname === "/login" || pathname === "/signup" || pathname === "/sys/login")
+  ) {
     return NextResponse.redirect(new URL("/", req.url));
   }
 
-  // Unauthenticated → /login
+  // Unauthenticated → зохих login руу шилжүүлнэ
   if (!isLoggedIn && !isPublic) {
+    // /sys/* (админ) → /sys/login
+    if (pathname.startsWith("/sys/") || pathname.startsWith("/api/sys/")) {
+      return NextResponse.redirect(new URL("/sys/login", req.url));
+    }
     return NextResponse.redirect(new URL("/login", req.url));
   }
 
