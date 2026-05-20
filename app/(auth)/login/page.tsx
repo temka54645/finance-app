@@ -3,22 +3,46 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Loader2, Mail, Lock, AlertCircle } from "lucide-react";
-import { loginAction } from "../actions";
+import { Loader2, Mail, Lock, AlertCircle, CheckCircle2 } from "lucide-react";
+import { loginAction, resendVerificationAction } from "../actions";
 import GoogleSignInButton from "@/components/GoogleSignInButton";
 
 export default function LoginPage() {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
+  const [resendPending, startResend] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const [needsVerification, setNeedsVerification] = useState(false);
+  const [resendOk, setResendOk] = useState(false);
+  const [lastEmail, setLastEmail] = useState("");
 
   const onSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setError(null);
+    setNeedsVerification(false);
+    setResendOk(false);
     const formData = new FormData(e.currentTarget);
+    setLastEmail(String(formData.get("email") ?? ""));
     startTransition(async () => {
       const res = await loginAction(formData);
-      if (res.ok) router.push("/");
+      if (res.ok) {
+        router.push("/");
+        return;
+      }
+      setError(res.error);
+      if (res.code === "EmailNotVerified") setNeedsVerification(true);
+    });
+  };
+
+  const onResend = () => {
+    if (!lastEmail) return;
+    setError(null);
+    setResendOk(false);
+    startResend(async () => {
+      const fd = new FormData();
+      fd.set("email", lastEmail);
+      const res = await resendVerificationAction(fd);
+      if (res.ok) setResendOk(true);
       else setError(res.error);
     });
   };
@@ -66,9 +90,28 @@ export default function LoginPage() {
         </div>
 
         {error && (
-          <div className="flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 px-3.5 py-2.5 text-sm text-red-700">
-            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
-            <span>{error}</span>
+          <div className="rounded-xl border border-red-200 bg-red-50 px-3.5 py-2.5 text-sm text-red-700">
+            <div className="flex items-start gap-2">
+              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+              <span className="flex-1">{error}</span>
+            </div>
+            {needsVerification && (
+              <button
+                type="button"
+                onClick={onResend}
+                disabled={resendPending || !lastEmail}
+                className="mt-2 inline-flex items-center gap-1.5 text-xs font-semibold text-red-700 underline-offset-2 hover:underline disabled:opacity-50"
+              >
+                {resendPending && <Loader2 className="h-3 w-3 animate-spin" />}
+                Баталгаажуулах линк дахин илгээх
+              </button>
+            )}
+          </div>
+        )}
+        {resendOk && (
+          <div className="flex items-start gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3.5 py-2.5 text-sm text-emerald-700">
+            <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />
+            <span>Шинэ баталгаажуулах линк илгээгдлээ. Имэйлээ шалгана уу.</span>
           </div>
         )}
 

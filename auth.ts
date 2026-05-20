@@ -33,6 +33,12 @@ const providers: Provider[] = [
       const ok = await bcrypt.compare(parsed.data.password, user.hashedPassword);
       if (!ok) return null;
 
+      // Email баталгаажуулаагүй бол нэвтэрч чадахгүй
+      if (!user.emailVerified) {
+        // NextAuth-ийн алдааг URL дээр `error=EmailNotVerified` болгож харуулна
+        throw new Error("EmailNotVerified");
+      }
+
       return { id: user.id, email: user.email, name: user.name, userType: user.userType, role: user.role };
     },
   }),
