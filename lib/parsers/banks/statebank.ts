@@ -107,10 +107,13 @@ export function parseStateBank(buffer: Buffer): ParsedTransaction[] {
     else continue; // 0/0 мөрийг алгасна
 
     const desc = String(row[COL.description] ?? "").trim();
-    const counterparty = String(row[COL.accountName] ?? "").trim();
-    const description = desc || counterparty || "Гүйлгээ";
+    const accName = String(row[COL.accountName] ?? "").trim();
+    const accNumber = String(row[COL.counterparty] ?? "").trim();
+    const description = desc || accName || "Гүйлгээ";
+    // Counterparty preferr account name + number combo if available
+    const counterparty = [accName, accNumber].filter(s => s && s !== "FEE").join(" · ") || undefined;
 
-    results.push({ date, description, amount });
+    results.push({ date, description, counterparty, amount });
   }
 
   return results;

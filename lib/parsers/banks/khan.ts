@@ -111,10 +111,10 @@ export function parseKhanBank(buffer: Buffer): ParsedTransaction[] {
     else continue;
 
     const desc = String(row[COL.description] ?? "").trim();
-    const counterparty = String(row[COL.counterparty] ?? "").trim();
-    const description = desc || counterparty || "Гүйлгээ";
+    const counterpartyRaw = String(row[COL.counterparty] ?? "").trim();
+    const description = desc || counterpartyRaw || "Гүйлгээ";
 
-    results.push({ date, description, amount });
+    results.push({ date, description, counterparty: counterpartyRaw || undefined, amount });
   }
 
   return results;

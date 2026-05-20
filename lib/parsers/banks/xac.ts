@@ -67,9 +67,10 @@ export function parseXacBank(buffer: Buffer): ParsedTransaction[] {
     const credit = Number(row["Орлого"]) || 0;
     const debit = Number(row["Зарлага"]) || 0;
     const description = String(row["Гүйлгээний утга"] ?? "").trim() || "Гүйлгээ";
+    const counterparty = String(row["Харьцсан данс"] ?? "").trim() || undefined;
 
-    if (credit > 0) results.push({ date, description, amount: credit });
-    else if (debit > 0) results.push({ date, description, amount: -debit });
+    if (credit > 0) results.push({ date, description, counterparty, amount: credit });
+    else if (debit > 0) results.push({ date, description, counterparty, amount: -debit });
   }
 
   return results;

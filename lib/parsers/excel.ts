@@ -3,6 +3,8 @@ import * as XLSX from "xlsx";
 export interface ParsedTransaction {
   date: Date;
   description: string;
+  /** Харьцсан данс / counterparty нэр эсвэл account number (optional) */
+  counterparty?: string;
   amount: number; // эерэг = орлого, сөрөг = зарлага
 }
 

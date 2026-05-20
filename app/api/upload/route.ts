@@ -99,6 +99,7 @@ export async function POST(req: NextRequest) {
             return {
               date: t.date,
               description: t.description,
+              counterparty: t.counterparty ?? null,
               amount: Math.abs(t.amount),
               type,
               category,

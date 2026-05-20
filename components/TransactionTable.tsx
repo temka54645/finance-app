@@ -12,6 +12,7 @@ interface Transaction {
   id: string;
   date: string;
   description: string;
+  counterparty?: string | null;
   amount: number;
   type: string;
   category: string;
@@ -39,6 +40,7 @@ function matchesSearch(t: Transaction, query: string): boolean {
     dateLocal,
     new Date(t.date).toISOString().slice(0, 10),
     t.description.toLowerCase(),
+    t.counterparty?.toLowerCase() ?? "",
     t.category.toLowerCase(),
     t.type === "income" ? "орлого income" : "зарлага expense",
     String(t.amount),
@@ -230,7 +232,12 @@ export default function TransactionTable({ transactions, onUpdate }: Props) {
                     {new Date(t.date).toLocaleDateString("mn-MN")}
                   </td>
                   <td className="px-4 py-3 max-w-xs">
-                    <p className="truncate text-gray-800">{t.description}</p>
+                    <p className="truncate text-gray-800" title={t.description}>{t.description}</p>
+                    {t.counterparty && (
+                      <p className="truncate text-[11px] text-slate-500 mt-0.5" title={t.counterparty}>
+                        <span className="text-slate-400">↔</span> {t.counterparty}
+                      </p>
+                    )}
                     {showBankFilter && (
                       <div className="mt-1">
                         <BankBadge bankName={t.statement?.bankName ?? null} size="sm" />

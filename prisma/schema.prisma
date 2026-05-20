@@ -120,16 +120,18 @@ model Statement {
 }
 
 model Transaction {
-  id          String    @id @default(cuid())
-  statementId String
-  statement   Statement @relation(fields: [statementId], references: [id], onDelete: Cascade)
-  date        DateTime
-  description String
-  amount      Float
-  type        String
-  category    String    @default("Ангилаагүй")
-  note        String?
-  createdAt   DateTime  @default(now())
+  id           String    @id @default(cuid())
+  statementId  String
+  statement    Statement @relation(fields: [statementId], references: [id], onDelete: Cascade)
+  date         DateTime
+  description  String
+  /// Харьцсан данс (counterparty account / counterparty name) — banking parser-аас гарна
+  counterparty String?
+  amount       Float
+  type         String
+  category     String    @default("Ангилаагүй")
+  note         String?
+  createdAt    DateTime  @default(now())
 
   @@index([statementId])
   @@index([date])
