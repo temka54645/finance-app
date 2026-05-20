@@ -12,8 +12,8 @@ const montserrat = Montserrat({
 });
 
 export const metadata: Metadata = {
-  title: "Finance Analytics — Санхүүгийн дүн шинжилгээ",
-  description: "Банкны хуулга задлан шинжилгээ",
+  title: "FinMate — Таны цахим санхүүгийн зөвлөх",
+  description: "Таны цахим санхүүгийн зөвлөх. Банкны хуулгыг автоматаар задлан, орлого зарлагыг ангилж, ухаалаг дүн шинжилгээ хийнэ.",
 };
 
 export default function RootLayout({

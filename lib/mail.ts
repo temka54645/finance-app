@@ -7,7 +7,7 @@
 import { Resend } from "resend";
 
 const RESEND_API_KEY = process.env.RESEND_API_KEY;
-const FROM_EMAIL = process.env.MAIL_FROM ?? "Finance Analytics <onboarding@resend.dev>";
+const FROM_EMAIL = process.env.MAIL_FROM ?? "FinMate <onboarding@resend.dev>";
 const APP_URL = process.env.NEXTAUTH_URL ?? process.env.APP_URL ?? "http://localhost:3000";
 
 const resend = RESEND_API_KEY ? new Resend(RESEND_API_KEY) : null;
@@ -25,13 +25,13 @@ export async function sendVerificationEmail({ email, token, name }: SendVerifica
   const verifyUrl = `${APP_URL}/verify-email?token=${encodeURIComponent(token)}`;
   const greeting = name ? `Сайн байна уу, ${name}!` : "Сайн байна уу!";
 
-  const subject = "Finance Analytics — имэйл баталгаажуулна уу";
+  const subject = "FinMate — имэйл баталгаажуулна уу";
 
   const html = `
     <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 560px; margin: 0 auto; padding: 24px; color: #0f172a;">
       <div style="text-align: center; margin-bottom: 32px;">
-        <h1 style="margin: 0; font-size: 24px; font-weight: 700; color: #2563eb;">Finance Analytics</h1>
-        <p style="margin: 8px 0 0; color: #64748b; font-size: 14px;">Банкны хуулга задлан шинжилгээ</p>
+        <h1 style="margin: 0; font-size: 24px; font-weight: 700; color: #2563eb;">FinMate</h1>
+        <p style="margin: 8px 0 0; color: #64748b; font-size: 14px;">Таны цахим санхүүгийн зөвлөх</p>
       </div>
       <div style="background: #f8fafc; border-radius: 16px; padding: 24px; border: 1px solid #e2e8f0;">
         <p style="margin: 0 0 16px; font-size: 16px;">${greeting}</p>

@@ -55,8 +55,8 @@ function StatCard({
 }) {
   const p = PALETTES[accent];
   return (
-    <div className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-5 shadow-lg shadow-slate-200/60">
-      <div className={`pointer-events-none absolute -right-12 -top-12 h-40 w-40 rounded-full bg-gradient-radial ${p.ring} opacity-80 blur-2xl`} />
+    <div className="group relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-5 shadow-lg shadow-slate-200/60 transition-all duration-300 hover:shadow-xl hover:shadow-slate-200/80 hover:-translate-y-0.5">
+      <div className={`pointer-events-none absolute -right-12 -top-12 h-40 w-40 rounded-full bg-gradient-radial ${p.ring} opacity-80 blur-2xl transition-transform duration-500 group-hover:scale-110`} />
       <div className="relative flex items-start justify-between">
         <p className="text-xs font-medium uppercase tracking-wider text-slate-500">{label}</p>
         <span className={`flex h-8 w-8 items-center justify-center rounded-lg ${p.chip}`}>

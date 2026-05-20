@@ -19,7 +19,7 @@ export default function AuthLayout({ children }: { children: ReactNode }) {
               <BarChart2 className="h-5 w-5 text-white" />
             </div>
             <span className="text-base font-semibold tracking-tight text-slate-900">
-              Finance Analytics
+              FinMate
             </span>
           </div>
 
@@ -32,7 +32,7 @@ export default function AuthLayout({ children }: { children: ReactNode }) {
                 </span>
               </h2>
               <p className="mt-4 max-w-sm text-sm leading-relaxed text-slate-600">
-                Орлого, зарлагаа нэг дороос хянаж, сар бүрийн чиг хандлагаа ил тод харна уу.
+                Таны цахим санхүүгийн зөвлөх — орлого, зарлагаа нэг дороос хянаж, сар бүрийн чиг хандлагаа ил тод харна уу.
               </p>
             </div>
 
@@ -53,7 +53,7 @@ export default function AuthLayout({ children }: { children: ReactNode }) {
           </div>
 
           <p className="text-xs text-slate-500">
-            © {new Date().getFullYear()} Finance Analytics
+            © {new Date().getFullYear()} FinMate
           </p>
         </aside>
 
@@ -66,7 +66,7 @@ export default function AuthLayout({ children }: { children: ReactNode }) {
                 <BarChart2 className="h-5 w-5 text-white" />
               </div>
               <span className="text-base font-semibold tracking-tight text-slate-900">
-                Finance Analytics
+                FinMate
               </span>
             </div>
             {children}

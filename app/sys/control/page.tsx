@@ -4,7 +4,7 @@ import { prisma } from "@/lib/db";
 import AdminClient from "@/components/AdminClient";
 
 export const metadata = {
-  title: "Админ удирдлага | Finance Analytics",
+  title: "Админ удирдлага | FinMate",
   robots: { index: false, follow: false },
 };
 

@@ -717,7 +717,7 @@ export default function AdminClient() {
         )}
 
         <p className="pt-2 text-center text-xs text-slate-400">
-          © {new Date().getFullYear()} Finance Analytics — Admin · /sys/control
+          © {new Date().getFullYear()} FinMate — Admin · /sys/control
         </p>
       </main>
     </div>

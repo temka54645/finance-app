@@ -49,7 +49,7 @@ export default function OnboardingPage() {
             <BarChart2 className="h-5 w-5 text-white" />
           </div>
           <span className="text-base font-semibold tracking-tight text-slate-900">
-            Finance Analytics
+            FinMate
           </span>
         </div>
 
