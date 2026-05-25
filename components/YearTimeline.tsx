@@ -103,10 +103,14 @@ export default function YearTimeline({ onChange }: Props) {
     });
   };
 
-  const handleUploadSuccess = () => {
-    setUploadModalOpen(false);
+  // Upload-ийн дараа timeline-ийг refetch хийнэ — панелийг автоматаар хаахгүй.
+  // Хэрэглэгч success banner дахь "Дашбоард руу очих" товчоор л хаана.
+  const handleUploadRefetch = () => {
     fetchTimeline();
     onChange();
+  };
+  const handleUploadClose = () => {
+    setUploadModalOpen(false);
   };
 
   if (loading) {
@@ -124,7 +128,7 @@ export default function YearTimeline({ onChange }: Props) {
         <p className="text-slate-400 text-xs mb-6">Эхний statement-ээ оруулаад эхлээрэй</p>
         {uploadModalOpen ? (
           <div className="max-w-sm mx-auto">
-            <FileUpload onSuccess={handleUploadSuccess} />
+            <FileUpload onSuccess={handleUploadRefetch} onRequestClose={handleUploadClose} />
           </div>
         ) : (
           <button

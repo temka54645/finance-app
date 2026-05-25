@@ -79,34 +79,17 @@ export async function POST(req: NextRequest) {
       ? false
       : (isLimitBypassed() || getTier(user?.plan).limits.aiCategorization);
 
-    // ── AI categorization + gap-detection-ийг ЗЭРЭГ явуулна ──
-    // Categorize нь parsed transactions-аас, gap нь stmtMeta-аас хамаарна.
-    // Бие биеэс хамааралгүй тул хоёуланг нь Promise.all-р параллел гүйцэтгэнэ.
+    // ── AI categorization ──
+    // Gap-detection-ийг энд хийхгүй: parallel upload-ийн үед зэрэг ажиллаж буй
+    // request-үүд бие биеийнхээ commit-ийг хараагүй учир false-positive өгдөг.
+    // Үүнийг тусдаа `/api/statements/gaps` endpoint-аар бүх upload дууссаны
+    // дараа нэг л удаа гүйцэтгэнэ (client-ээс trigger хийнэ).
     const tAiStart = performance.now();
-    const priorStmtPromise = (
-      stmtMeta?.periodStart &&
-      stmtMeta?.openingBalance != null &&
-      Number.isFinite(stmtMeta.openingBalance)
-    )
-      ? prisma.statement.findFirst({
-          where: {
-            userId,
-            periodEnd: { lt: stmtMeta.periodStart, not: null },
-            closingBalance: { not: null },
-          },
-          orderBy: { periodEnd: "desc" },
-          select: { fileName: true, periodEnd: true, closingBalance: true },
-        })
-      : Promise.resolve(null);
-
-    const [categorized, prior] = await Promise.all([
-      categorizeTransactions(
-        parsed.map(t => ({ description: t.description, amount: t.amount })),
-        userType,
-        { useAi: allowAi }
-      ),
-      priorStmtPromise,
-    ]);
+    const categorized = await categorizeTransactions(
+      parsed.map(t => ({ description: t.description, amount: t.amount })),
+      userType,
+      { useAi: allowAi }
+    );
     const tAiEnd = performance.now();
 
     const finalBankName = bankNameInput || detectedBank;
@@ -151,41 +134,11 @@ export async function POST(req: NextRequest) {
     await prisma.transaction.createMany({ data: txRows });
     const tDbEnd = performance.now();
 
-    // ─── Gap detection (зөвхөн харьцуулалт; query аль хэдийн дээр) ──
-    let gapWarning: {
-      message: string;
-      diff: number;
-      priorFile: string;
-      priorPeriodEnd: string | null;
-      priorClosing: number;
-      thisOpening: number;
-    } | null = null;
-
-    if (
-      stmtMeta?.openingBalance != null &&
-      Number.isFinite(stmtMeta.openingBalance) &&
-      prior?.closingBalance != null &&
-      Number.isFinite(prior.closingBalance)
-    ) {
-      const diff = stmtMeta.openingBalance - prior.closingBalance;
-      if (Math.abs(diff) > 1) {
-        const fmt = (n: number) => n.toLocaleString("mn-MN", { maximumFractionDigits: 2 }) + "₮";
-        gapWarning = {
-          message: `Анхаарал: Энэ хуулгын эхний үлдэгдэл (${fmt(stmtMeta.openingBalance)}) нь өмнөх хуулгын эцсийн үлдэгдлээс (${fmt(prior.closingBalance)}) ${fmt(Math.abs(diff))}-ээр зөрж байна. Дунд нь оруулаагүй хуулга байж магадгүй.`,
-          diff,
-          priorFile: prior.fileName,
-          priorPeriodEnd: prior.periodEnd ? prior.periodEnd.toISOString() : null,
-          priorClosing: prior.closingBalance,
-          thisOpening: stmtMeta.openingBalance,
-        };
-      }
-    }
-
     const tTotal = performance.now() - tStart;
     console.log(
       `[upload] ${fileName} total=${tTotal | 0}ms ` +
       `parse=${(tParseEnd - tParseStart) | 0}ms ` +
-      `ai+priorQuery=${(tAiEnd - tAiStart) | 0}ms ` +
+      `ai=${(tAiEnd - tAiStart) | 0}ms ` +
       `db=${(tDbEnd - tDbStart) | 0}ms ` +
       `tx=${parsed.length} allowAi=${allowAi}`
     );
@@ -200,13 +153,13 @@ export async function POST(req: NextRequest) {
       periodEnd: stmtMeta?.periodEnd ?? null,
       openingBalance: stmtMeta?.openingBalance ?? null,
       closingBalance: stmtMeta?.closingBalance ?? null,
-      gapWarning,
-      // Timing diagnostics — UI дээр харуулна. Production-д ч аюулгүй
-      // (зөвхөн ms тоо, sensitive мэдээлэлгүй).
+      // Gap-warning per-upload биш — бүх upload дууссаны дараа client
+      // `/api/statements/gaps`-аас бүхэлд нь шинэчилнэ.
+      // Timing diagnostics — UI дээр харуулна. Production-д ч аюулгүй.
       timing: {
         total: Math.round(tTotal),
         parse: Math.round(tParseEnd - tParseStart),
-        aiAndPrior: Math.round(tAiEnd - tAiStart),
+        ai: Math.round(tAiEnd - tAiStart),
         db: Math.round(tDbEnd - tDbStart),
         allowAi,
       },

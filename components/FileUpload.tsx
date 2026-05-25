@@ -5,7 +5,10 @@ import Link from "next/link";
 import { Upload, Loader2, Sparkles, CheckCircle2, AlertCircle, Clock } from "lucide-react";
 
 interface Props {
+  /** Файл амжилттай boловсруулагдаж dashboard data-г refetch хийх ёстой үед автоматаар дуудагдана. Modal-ийг хаахгүй. */
   onSuccess: () => void;
+  /** Хэрэглэгч success banner дахь "Дашбоард руу очих" товчийг даргахад дуудагдана. Modal-ийг хаах ёстой. Заагүй бол товч харагдахгүй. */
+  onRequestClose?: () => void;
   compact?: boolean;
 }
 
@@ -19,7 +22,7 @@ type ItemStatus = "pending" | "uploading" | "done" | "error" | "limit";
 interface ServerTiming {
   total: number;
   parse: number;
-  aiAndPrior: number;
+  ai: number;
   db: number;
   allowAi: boolean;
 }
@@ -34,6 +37,7 @@ interface QueueItem {
   gapWarning?: string | null;
   clientMs?: number;
   serverTiming?: ServerTiming;
+  statementId?: string;
 }
 
 const ACCEPT = ".pdf,.xlsx,.xls,.csv";
@@ -44,7 +48,7 @@ function fmtBytes(n: number) {
   return (n / 1024 / 1024).toFixed(1) + " MB";
 }
 
-export default function FileUpload({ onSuccess, compact = false }: Props) {
+export default function FileUpload({ onSuccess, onRequestClose, compact = false }: Props) {
   const [isDragging, setIsDragging] = useState(false);
   const [queue, setQueue] = useState<QueueItem[]>([]);
   const [processing, setProcessing] = useState(false);
@@ -64,10 +68,10 @@ export default function FileUpload({ onSuccess, compact = false }: Props) {
       setQueue(prev => [...prev, ...newItems]);
       setLimit(null);
 
-      // Файлуудыг concurrency=3-р параллел upload хийнэ. Sequential-аас 2–3х
-      // хурдан. Limit exceeded бол шинэ task pick хийхийг зогсоож, явж буй
-      // task-уудыг хэвээр дуусгана.
-      const CONCURRENCY = 3;
+      // Concurrency=2 — Node event-loop болон Prisma client тогтворжуулна.
+      // Туршилтаар concurrency=3 нь хоёр дахь wave-д db latency 3.5x өсгөж
+      // байсан (event-loop saturation). =2 нь хурд тэгшилнэ.
+      const CONCURRENCY = 2;
       setProcessing(true);
       let successCount = 0;
       let limitReached = false;
@@ -97,7 +101,7 @@ export default function FileUpload({ onSuccess, compact = false }: Props) {
                 detectedBank?: string | null;
                 code?: string;
                 upgradeUrl?: string;
-                gapWarning?: { message: string } | null;
+                statement?: { id?: string };
                 timing?: ServerTiming;
               } = {};
               try {
@@ -134,9 +138,12 @@ export default function FileUpload({ onSuccess, compact = false }: Props) {
                         status: "done",
                         count: data.count ?? 0,
                         detectedBank: data.detectedBank ?? null,
-                        gapWarning: data.gapWarning?.message ?? null,
+                        // gapWarning эхэндээ null. Бүх upload дууссаны дараа
+                        // /api/statements/gaps-аас merge хийгдэнэ.
+                        gapWarning: null,
                         clientMs,
                         serverTiming: data.timing,
+                        statementId: data.statement?.id,
                       }
                     : q
                 )
@@ -166,8 +173,32 @@ export default function FileUpload({ onSuccess, compact = false }: Props) {
         );
       } finally {
         setProcessing(false);
-        // Ядаж нэг файл амжилттай боловсруулсан үед dashboard-ыг refetch хийнэ
-        if (successCount > 0) onSuccess();
+        // Бүх upload commit болсны дараа gap-detection-ийг нэг л удаа гүйцэтгэнэ.
+        // Үүнийг сервер дээр sequential way-аар (periodEnd-аар sort) шалгадаг
+        // тул parallel upload-ийн race condition үүсэхгүй.
+        if (successCount > 0) {
+          try {
+            const gapsRes = await fetch("/api/statements/gaps");
+            if (gapsRes.ok) {
+              const { gaps } = await gapsRes.json() as {
+                gaps: Array<{ statementId: string; message: string }>;
+              };
+              const gapMap = new Map(gaps.map(g => [g.statementId, g.message]));
+              setQueue(prev =>
+                prev.map(q =>
+                  q.statementId && gapMap.has(q.statementId)
+                    ? { ...q, gapWarning: gapMap.get(q.statementId) ?? null }
+                    : q
+                )
+              );
+            }
+          } catch {
+            // Gap-check амжилтгүй болсон ч upload бүхэлдээ амжилттай —
+            // дараа Statements хэсэгт дахин шалгаж болно. Чимээгүй унтраана.
+          }
+          // Dashboard-ыг refetch хийнэ
+          onSuccess();
+        }
       }
     },
     [bankName, onSuccess]
@@ -194,6 +225,15 @@ export default function FileUpload({ onSuccess, compact = false }: Props) {
   };
 
   const hasFinished = queue.some(q => q.status === "done" || q.status === "error" || q.status === "limit");
+
+  // Бүгд дууссан (uploading/pending байхгүй) бөгөөд ядаж нэг done байгаа үед
+  // амжилтын banner харуулна. Test mode-д modal хаагдахгүй учир үүнийг
+  // хэрэглэгч цонхондоо үлдээж харна.
+  const allFinished = !processing && queue.length > 0 &&
+    queue.every(q => q.status === "done" || q.status === "error" || q.status === "limit");
+  const doneCount = queue.filter(q => q.status === "done").length;
+  const errorCount = queue.filter(q => q.status === "error").length;
+  const showSuccessBanner = allFinished && doneCount > 0;
 
   return (
     <div className={compact ? "space-y-2" : "space-y-3"}>
@@ -252,6 +292,32 @@ export default function FileUpload({ onSuccess, compact = false }: Props) {
           </>
         )}
       </label>
+
+      {/* Амжилтын banner — бүх файл боловсруулагдсаны дараа.
+          Хэрэглэгчийн зөвшөөрөл хүсээд, "Дашбоард руу очих" товчоор л хаагдана. */}
+      {showSuccessBanner && (
+        <div className={`flex items-start gap-2 text-emerald-800 bg-emerald-50 border border-emerald-200 px-3 py-2.5 rounded-lg animate-fade-in ${compact ? "text-xs" : "text-sm"}`}>
+          <CheckCircle2 className={`flex-shrink-0 text-emerald-600 ${compact ? "w-3.5 h-3.5 mt-0.5" : "w-4 h-4 mt-0.5"}`} />
+          <div className="flex-1 min-w-0">
+            <p className="font-semibold">
+              Амжилттай дууслаа · {doneCount}/{queue.length} файл
+              {errorCount > 0 && <span className="text-rose-700"> ({errorCount} алдаатай)</span>}
+            </p>
+            <p className="text-emerald-700/80 mt-0.5">
+              Гүйлгээ амжилттай хадгалагдлаа. Доорх жагсаалтаас дэлгэрэнгүйг харна уу.
+            </p>
+            {onRequestClose && (
+              <button
+                type="button"
+                onClick={onRequestClose}
+                className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-lg transition-colors"
+              >
+                Дашбоард руу очих →
+              </button>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Файлын жагсаалт */}
       {queue.length > 0 && (
@@ -321,7 +387,7 @@ export default function FileUpload({ onSuccess, compact = false }: Props) {
                   <div className="mt-1 text-[10px] text-slate-500 font-mono">
                     ⏱ {item.clientMs ?? "?"}ms (server {item.serverTiming.total}ms ·
                     parse {item.serverTiming.parse} ·
-                    ai {item.serverTiming.aiAndPrior} ·
+                    ai {item.serverTiming.ai} ·
                     db {item.serverTiming.db}
                     {!item.serverTiming.allowAi && " · ai=off"})
                   </div>

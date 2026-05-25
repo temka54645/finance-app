@@ -54,9 +54,14 @@ export default function DashboardClient() {
     return () => document.removeEventListener("keydown", onEsc);
   }, [uploadModalOpen]);
 
-  const handleUploadSuccess = () => {
-    setUploadModalOpen(false);
+  // Upload-ийн дараа dashboard data-г refetch хийнэ — modal-ыг автоматаар
+  // ХАЯ-х-гүй. Хэрэглэгч success banner дахь "Дашбоард руу очих" товчоор л
+  // зөвшөөрөл өгч хаана. (Эсвэл modal-ийн X / Escape товчоор гар аргаар.)
+  const handleUploadRefetch = () => {
     fetchOverview();
+  };
+  const handleUploadClose = () => {
+    setUploadModalOpen(false);
   };
 
   const displayName = session?.user?.name || session?.user?.email?.split("@")[0] || "хэрэглэгч";
@@ -194,7 +199,7 @@ export default function DashboardClient() {
             <p className="text-xs text-slate-500 mb-4">
               PDF, Excel (.xlsx) эсвэл CSV формат дэмжигдэнэ. Файл доторх гүйлгээ нь огнооны дагуу зөв сард байршина.
             </p>
-            <FileUpload onSuccess={handleUploadSuccess} />
+            <FileUpload onSuccess={handleUploadRefetch} onRequestClose={handleUploadClose} />
           </div>
         </>
       )}
