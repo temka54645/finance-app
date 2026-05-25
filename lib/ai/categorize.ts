@@ -145,18 +145,25 @@ export async function categorizeTransactions(
     return results as CategorizationResult[];
   }
 
+  // Нэг файлын дотор хэд хэдэн batch гарвал параллел гүйцэтгэнэ.
+  // Anthropic API нь нэг файлын дотор 2-3 зэрэг дуудлагыг харьцангуй амар даадаг.
   const BATCH_SIZE = 30;
-  const aiResults: CategorizationResult[] = [];
-
+  const batches: TransactionInput[][] = [];
   for (let i = 0; i < aiInputs.length; i += BATCH_SIZE) {
-    const batch = aiInputs.slice(i, i + BATCH_SIZE);
-    try {
-      aiResults.push(...await categorizeBatch(batch, incomeCats, expenseCats));
-    } catch (err) {
-      console.error(`AI batch ${i}-${i + BATCH_SIZE} failed:`, err);
-      aiResults.push(...fallback(batch, fallbackIncome, fallbackExpense));
-    }
+    batches.push(aiInputs.slice(i, i + BATCH_SIZE));
   }
+
+  const batchResults = await Promise.all(
+    batches.map(async (batch, idx) => {
+      try {
+        return await categorizeBatch(batch, incomeCats, expenseCats);
+      } catch (err) {
+        console.error(`AI batch #${idx} (${batch.length} tx) failed:`, err);
+        return fallback(batch, fallbackIncome, fallbackExpense);
+      }
+    })
+  );
+  const aiResults: CategorizationResult[] = batchResults.flat();
 
   aiNeededIdx.forEach((origIdx, i) => {
     results[origIdx] = aiResults[i] ?? fallback([transactions[origIdx]], fallbackIncome, fallbackExpense)[0];

@@ -16,6 +16,14 @@ interface LimitInfo {
 
 type ItemStatus = "pending" | "uploading" | "done" | "error" | "limit";
 
+interface ServerTiming {
+  total: number;
+  parse: number;
+  aiAndPrior: number;
+  db: number;
+  allowAi: boolean;
+}
+
 interface QueueItem {
   id: string;
   file: File;
@@ -24,6 +32,8 @@ interface QueueItem {
   count?: number;
   detectedBank?: string | null;
   gapWarning?: string | null;
+  clientMs?: number;
+  serverTiming?: ServerTiming;
 }
 
 const ACCEPT = ".pdf,.xlsx,.xls,.csv";
@@ -54,85 +64,106 @@ export default function FileUpload({ onSuccess, compact = false }: Props) {
       setQueue(prev => [...prev, ...newItems]);
       setLimit(null);
 
-      // Хэрэв процесс ажиллаж байгаа бол шинэ item-уудыг хүлээж байлгая
-      // (тус тусын батч дотор дараалал хадгална)
+      // Файлуудыг concurrency=3-р параллел upload хийнэ. Sequential-аас 2–3х
+      // хурдан. Limit exceeded бол шинэ task pick хийхийг зогсоож, явж буй
+      // task-уудыг хэвээр дуусгана.
+      const CONCURRENCY = 3;
       setProcessing(true);
       let successCount = 0;
+      let limitReached = false;
+
       try {
-        for (const item of newItems) {
-          setQueue(prev =>
-            prev.map(q => (q.id === item.id ? { ...q, status: "uploading" } : q))
-          );
+        let cursor = 0;
+        const worker = async () => {
+          while (cursor < newItems.length && !limitReached) {
+            const item = newItems[cursor++];
 
-          const formData = new FormData();
-          formData.append("file", item.file);
-          if (bankName) formData.append("bankName", bankName);
+            setQueue(prev =>
+              prev.map(q => (q.id === item.id ? { ...q, status: "uploading" } : q))
+            );
 
-          try {
-            const res = await fetch("/api/upload", { method: "POST", body: formData });
-            const text = await res.text();
-            let data: {
-              error?: string;
-              count?: number;
-              detectedBank?: string | null;
-              code?: string;
-              upgradeUrl?: string;
-              gapWarning?: { message: string } | null;
-            } = {};
+            const formData = new FormData();
+            formData.append("file", item.file);
+            if (bankName) formData.append("bankName", bankName);
+
+            const clientStart = performance.now();
             try {
-              data = text ? JSON.parse(text) : {};
-            } catch {
-              throw new Error("Сервер JSON биш хариу буцаалаа");
-            }
+              const res = await fetch("/api/upload", { method: "POST", body: formData });
+              const clientMs = Math.round(performance.now() - clientStart);
+              const text = await res.text();
+              let data: {
+                error?: string;
+                count?: number;
+                detectedBank?: string | null;
+                code?: string;
+                upgradeUrl?: string;
+                gapWarning?: { message: string } | null;
+                timing?: ServerTiming;
+              } = {};
+              try {
+                data = text ? JSON.parse(text) : {};
+              } catch {
+                throw new Error("Сервер JSON биш хариу буцаалаа");
+              }
 
-            if (res.status === 402 && data.code === "LIMIT_EXCEEDED") {
-              setLimit({
-                message: data.error ?? "Багцын хязгаар хэтэрсэн",
-                upgradeUrl: data.upgradeUrl ?? "/account#billing",
-              });
+              if (res.status === 402 && data.code === "LIMIT_EXCEEDED") {
+                limitReached = true;
+                setLimit({
+                  message: data.error ?? "Багцын хязгаар хэтэрсэн",
+                  upgradeUrl: data.upgradeUrl ?? "/account#billing",
+                });
+                setQueue(prev =>
+                  prev.map(q =>
+                    q.id === item.id
+                      ? { ...q, status: "limit", message: data.error ?? "Багцын хязгаар хэтэрсэн" }
+                      : q
+                  )
+                );
+                return;
+              }
+
+              if (!res.ok) {
+                throw new Error(data.error ?? `HTTP ${res.status}`);
+              }
+
               setQueue(prev =>
                 prev.map(q =>
                   q.id === item.id
-                    ? { ...q, status: "limit", message: data.error ?? "Багцын хязгаар хэтэрсэн" }
+                    ? {
+                        ...q,
+                        status: "done",
+                        count: data.count ?? 0,
+                        detectedBank: data.detectedBank ?? null,
+                        gapWarning: data.gapWarning?.message ?? null,
+                        clientMs,
+                        serverTiming: data.timing,
+                      }
                     : q
                 )
               );
-              // Limit exceeded — үлдсэн файлуудыг алгасч хэрэглэгчид сонголт өгнө
-              break;
+              successCount++;
+            } catch (err) {
+              setQueue(prev =>
+                prev.map(q =>
+                  q.id === item.id
+                    ? {
+                        ...q,
+                        status: "error",
+                        message: err instanceof Error ? err.message : "Алдаа",
+                      }
+                    : q
+                )
+              );
             }
-
-            if (!res.ok) {
-              throw new Error(data.error ?? `HTTP ${res.status}`);
-            }
-
-            setQueue(prev =>
-              prev.map(q =>
-                q.id === item.id
-                  ? {
-                      ...q,
-                      status: "done",
-                      count: data.count ?? 0,
-                      detectedBank: data.detectedBank ?? null,
-                      gapWarning: data.gapWarning?.message ?? null,
-                    }
-                  : q
-              )
-            );
-            successCount++;
-          } catch (err) {
-            setQueue(prev =>
-              prev.map(q =>
-                q.id === item.id
-                  ? {
-                      ...q,
-                      status: "error",
-                      message: err instanceof Error ? err.message : "Алдаа",
-                    }
-                  : q
-              )
-            );
           }
-        }
+        };
+
+        await Promise.all(
+          Array.from(
+            { length: Math.min(CONCURRENCY, newItems.length) },
+            () => worker()
+          )
+        );
       } finally {
         setProcessing(false);
         // Ядаж нэг файл амжилттай боловсруулсан үед dashboard-ыг refetch хийнэ
@@ -284,6 +315,15 @@ export default function FileUpload({ onSuccess, compact = false }: Props) {
                   <div className="mt-1.5 flex items-start gap-1.5 rounded-md border border-amber-200 bg-amber-100/60 px-2 py-1.5 text-[11px] leading-snug text-amber-900 animate-fade-in">
                     <Sparkles className="h-3 w-3 flex-shrink-0 mt-0.5 text-amber-600" />
                     <span className="break-words">{item.gapWarning}</span>
+                  </div>
+                )}
+                {item.status === "done" && item.serverTiming && (
+                  <div className="mt-1 text-[10px] text-slate-500 font-mono">
+                    ⏱ {item.clientMs ?? "?"}ms (server {item.serverTiming.total}ms ·
+                    parse {item.serverTiming.parse} ·
+                    ai {item.serverTiming.aiAndPrior} ·
+                    db {item.serverTiming.db}
+                    {!item.serverTiming.allowAi && " · ai=off"})
                   </div>
                 )}
               </li>

@@ -13,6 +13,8 @@ export const maxDuration = 120;
 export const runtime = "nodejs";
 
 export async function POST(req: NextRequest) {
+  const tStart = performance.now();
+  let fileName = "?";
   try {
     const userId = await requireUserId();
 
@@ -28,13 +30,14 @@ export async function POST(req: NextRequest) {
     }
 
     const buffer = Buffer.from(await file.arrayBuffer());
-    const fileName = file.name;
+    fileName = file.name;
     const ext = fileName.split(".").pop()?.toLowerCase();
 
     let parsed: ParsedTransaction[] = [];
     let detectedBank: string | null = null;
     let stmtMeta: StatementMeta | undefined = undefined;
 
+    const tParseStart = performance.now();
     if (ext === "pdf") {
       parsed = await parsePDF(buffer);
     } else if (ext === "csv") {
@@ -52,6 +55,7 @@ export async function POST(req: NextRequest) {
       const rawRows = extractRawRows(buffer);
       parsed = await aiExtractTransactions(rawRows);
     }
+    const tParseEnd = performance.now();
 
     if (parsed.length === 0) {
       return NextResponse.json({
@@ -70,16 +74,47 @@ export async function POST(req: NextRequest) {
 
     // free tier бол AI ашиглахгүй, зөвхөн regex/keyword fallback.
     // Beta/тестийн үед bypass хийнэ — бүгдэд AI нээлттэй.
-    const allowAi = isLimitBypassed() || getTier(user?.plan).limits.aiCategorization;
+    // LOCAL_DISABLE_AI=1 үед локал тестэд AI бүхэлдээ хаалттай — хурдан regex fallback.
+    const allowAi = process.env.LOCAL_DISABLE_AI === "1"
+      ? false
+      : (isLimitBypassed() || getTier(user?.plan).limits.aiCategorization);
 
-    const categorized = await categorizeTransactions(
-      parsed.map(t => ({ description: t.description, amount: t.amount })),
-      userType,
-      { useAi: allowAi }
-    );
+    // ── AI categorization + gap-detection-ийг ЗЭРЭГ явуулна ──
+    // Categorize нь parsed transactions-аас, gap нь stmtMeta-аас хамаарна.
+    // Бие биеэс хамааралгүй тул хоёуланг нь Promise.all-р параллел гүйцэтгэнэ.
+    const tAiStart = performance.now();
+    const priorStmtPromise = (
+      stmtMeta?.periodStart &&
+      stmtMeta?.openingBalance != null &&
+      Number.isFinite(stmtMeta.openingBalance)
+    )
+      ? prisma.statement.findFirst({
+          where: {
+            userId,
+            periodEnd: { lt: stmtMeta.periodStart, not: null },
+            closingBalance: { not: null },
+          },
+          orderBy: { periodEnd: "desc" },
+          select: { fileName: true, periodEnd: true, closingBalance: true },
+        })
+      : Promise.resolve(null);
+
+    const [categorized, prior] = await Promise.all([
+      categorizeTransactions(
+        parsed.map(t => ({ description: t.description, amount: t.amount })),
+        userType,
+        { useAi: allowAi }
+      ),
+      priorStmtPromise,
+    ]);
+    const tAiEnd = performance.now();
 
     const finalBankName = bankNameInput || detectedBank;
 
+    // ── DB бичих: statement.create (хоосон) → transaction.createMany ──
+    // Хуучин nested create нь Prisma client дотор N+1 INSERT хийдэг.
+    // createMany нь нэг л INSERT мэдэгдэл болж dramatically хурдан.
+    const tDbStart = performance.now();
     const statement = await prisma.statement.create({
       data: {
         userId,
@@ -89,30 +124,34 @@ export async function POST(req: NextRequest) {
         periodEnd: stmtMeta?.periodEnd ?? null,
         openingBalance: stmtMeta?.openingBalance ?? null,
         closingBalance: stmtMeta?.closingBalance ?? null,
-        transactions: {
-          create: parsed.map((t, i) => {
-            const cat = categorized[i];
-            const type: "income" | "expense" = t.amount >= 0 ? "income" : "expense";
-            const category = (cat && cat.type === type)
-              ? cat.category
-              : (type === "income" ? "Бусад орлого" : "Бусад зарлага");
-            return {
-              date: t.date,
-              description: t.description,
-              counterparty: t.counterparty ?? null,
-              amount: Math.abs(t.amount),
-              type,
-              category,
-            };
-          }),
-        },
       },
-      include: { transactions: true },
     });
 
-    // ─── Gap detection ─────────────────────────────────────────────
-    // Энэ хуулгын periodStart-аас өмнө дууссан хамгийн ойрхон хуулгыг
-    // олж, түүний closingBalance vs шинэ openingBalance-ийг харьцуулна.
+    let incomeCount = 0;
+    let expenseCount = 0;
+    const txRows = parsed.map((t, i) => {
+      const cat = categorized[i];
+      const type: "income" | "expense" = t.amount >= 0 ? "income" : "expense";
+      if (type === "income") incomeCount++;
+      else expenseCount++;
+      const category = (cat && cat.type === type)
+        ? cat.category
+        : (type === "income" ? "Бусад орлого" : "Бусад зарлага");
+      return {
+        statementId: statement.id,
+        date: t.date,
+        description: t.description,
+        counterparty: t.counterparty ?? null,
+        amount: Math.abs(t.amount),
+        type,
+        category,
+      };
+    });
+
+    await prisma.transaction.createMany({ data: txRows });
+    const tDbEnd = performance.now();
+
+    // ─── Gap detection (зөвхөн харьцуулалт; query аль хэдийн дээр) ──
     let gapWarning: {
       message: string;
       diff: number;
@@ -123,55 +162,54 @@ export async function POST(req: NextRequest) {
     } | null = null;
 
     if (
-      stmtMeta?.periodStart &&
       stmtMeta?.openingBalance != null &&
-      Number.isFinite(stmtMeta.openingBalance)
+      Number.isFinite(stmtMeta.openingBalance) &&
+      prior?.closingBalance != null &&
+      Number.isFinite(prior.closingBalance)
     ) {
-      const prior = await prisma.statement.findFirst({
-        where: {
-          userId,
-          id: { not: statement.id },
-          periodEnd: { lt: stmtMeta.periodStart, not: null },
-          closingBalance: { not: null },
-        },
-        orderBy: { periodEnd: "desc" },
-        select: {
-          fileName: true,
-          periodEnd: true,
-          closingBalance: true,
-        },
-      });
-
-      if (
-        prior?.closingBalance != null &&
-        Number.isFinite(prior.closingBalance)
-      ) {
-        const diff = stmtMeta.openingBalance - prior.closingBalance;
-        if (Math.abs(diff) > 1) {
-          const fmt = (n: number) => n.toLocaleString("mn-MN", { maximumFractionDigits: 2 }) + "₮";
-          gapWarning = {
-            message: `Анхаарал: Энэ хуулгын эхний үлдэгдэл (${fmt(stmtMeta.openingBalance)}) нь өмнөх хуулгын эцсийн үлдэгдлээс (${fmt(prior.closingBalance)}) ${fmt(Math.abs(diff))}-ээр зөрж байна. Дунд нь оруулаагүй хуулга байж магадгүй.`,
-            diff,
-            priorFile: prior.fileName,
-            priorPeriodEnd: prior.periodEnd ? prior.periodEnd.toISOString() : null,
-            priorClosing: prior.closingBalance,
-            thisOpening: stmtMeta.openingBalance,
-          };
-        }
+      const diff = stmtMeta.openingBalance - prior.closingBalance;
+      if (Math.abs(diff) > 1) {
+        const fmt = (n: number) => n.toLocaleString("mn-MN", { maximumFractionDigits: 2 }) + "₮";
+        gapWarning = {
+          message: `Анхаарал: Энэ хуулгын эхний үлдэгдэл (${fmt(stmtMeta.openingBalance)}) нь өмнөх хуулгын эцсийн үлдэгдлээс (${fmt(prior.closingBalance)}) ${fmt(Math.abs(diff))}-ээр зөрж байна. Дунд нь оруулаагүй хуулга байж магадгүй.`,
+          diff,
+          priorFile: prior.fileName,
+          priorPeriodEnd: prior.periodEnd ? prior.periodEnd.toISOString() : null,
+          priorClosing: prior.closingBalance,
+          thisOpening: stmtMeta.openingBalance,
+        };
       }
     }
+
+    const tTotal = performance.now() - tStart;
+    console.log(
+      `[upload] ${fileName} total=${tTotal | 0}ms ` +
+      `parse=${(tParseEnd - tParseStart) | 0}ms ` +
+      `ai+priorQuery=${(tAiEnd - tAiStart) | 0}ms ` +
+      `db=${(tDbEnd - tDbStart) | 0}ms ` +
+      `tx=${parsed.length} allowAi=${allowAi}`
+    );
 
     return NextResponse.json({
       statement,
       detectedBank,
-      count: statement.transactions.length,
-      incomeCount: statement.transactions.filter(t => t.type === "income").length,
-      expenseCount: statement.transactions.filter(t => t.type === "expense").length,
+      count: parsed.length,
+      incomeCount,
+      expenseCount,
       periodStart: stmtMeta?.periodStart ?? null,
       periodEnd: stmtMeta?.periodEnd ?? null,
       openingBalance: stmtMeta?.openingBalance ?? null,
       closingBalance: stmtMeta?.closingBalance ?? null,
       gapWarning,
+      // Timing diagnostics — UI дээр харуулна. Production-д ч аюулгүй
+      // (зөвхөн ms тоо, sensitive мэдээлэлгүй).
+      timing: {
+        total: Math.round(tTotal),
+        parse: Math.round(tParseEnd - tParseStart),
+        aiAndPrior: Math.round(tAiEnd - tAiStart),
+        db: Math.round(tDbEnd - tDbStart),
+        allowAi,
+      },
     });
   } catch (err) {
     if (err instanceof UnauthorizedError) {
@@ -188,7 +226,7 @@ export async function POST(req: NextRequest) {
         upgradeUrl: "/account#billing",
       }, { status: 402 });
     }
-    console.error("[upload] error:", err);
+    console.error(`[upload] ${fileName} failed after ${(performance.now() - tStart) | 0}ms:`, err);
     return NextResponse.json({
       error: err instanceof Error ? err.message : "Серверийн алдаа"
     }, { status: 500 });
