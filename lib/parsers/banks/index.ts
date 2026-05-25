@@ -2,6 +2,7 @@ import { XAC_BANK, parseXacBank, extractXacMeta } from "./xac";
 import { TDB_BANK, parseTdbBank, extractTdbMeta } from "./tdb";
 import { STATE_BANK, parseStateBank, extractStateBankMeta } from "./statebank";
 import { KHAN_BANK, parseKhanBank, extractKhanMeta } from "./khan";
+import { GOLOMT_BANK, parseGolomtBank, extractGolomtMeta } from "./golomt";
 import { parseExcel, extractRawRows, type ParsedTransaction } from "../excel";
 
 export interface StatementMeta {
@@ -30,7 +31,8 @@ const BANK_TEMPLATES: BankTemplate[] = [
   { ...TDB_BANK,       parse: parseTdbBank,       extractMeta: extractTdbMeta       },
   { ...STATE_BANK,     parse: parseStateBank,     extractMeta: extractStateBankMeta },
   { ...KHAN_BANK,      parse: parseKhanBank,      extractMeta: extractKhanMeta      },
-  // Цаашид Golomt, Capitron гэх мэт нэмж болно
+  { ...GOLOMT_BANK,    parse: parseGolomtBank,    extractMeta: extractGolomtMeta    },
+  // Цаашид Capitron гэх мэт нэмж болно
 ];
 
 export interface ParseResult {
