@@ -273,30 +273,6 @@ export default function TransactionTable({ transactions, onUpdate }: Props) {
     }
   };
 
-  const applyBulkDelete = async () => {
-    if (selected.size === 0) return;
-    if (!confirm(`${selected.size} гүйлгээг бүгдийг устгах уу?\nЭнэ үйлдлийг буцаах боломжгүй.`)) return;
-    setBulkBusy(true);
-    try {
-      const res = await fetch("/api/transactions", {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ids: Array.from(selected) }),
-      });
-      if (!res.ok) {
-        const e = await res.json().catch(() => ({}));
-        alert(e.error ?? "Устгах амжилтгүй боллоо");
-        return;
-      }
-      clearSelection();
-      onUpdate();
-    } catch {
-      alert("Сүлжээний алдаа");
-    } finally {
-      setBulkBusy(false);
-    }
-  };
-
   const applyBulkType = async (newType: "income" | "expense") => {
     if (selected.size === 0) return;
     if (!confirm(`${selected.size} гүйлгээний төрлийг "${newType === "income" ? "Орлого" : "Зарлага"}" болгох уу?\n(Категорийг та дараа нь шинэчилнэ үү — одоогийн категори тохирохгүй байж магадгүй)`)) return;
@@ -678,25 +654,14 @@ export default function TransactionTable({ transactions, onUpdate }: Props) {
               </button>
             </div>
 
-            <div className="ml-auto inline-flex items-center gap-2">
-              <button
-                onClick={applyBulkDelete}
-                disabled={bulkBusy}
-                className="inline-flex items-center gap-1 rounded-md border border-rose-300 bg-white px-2.5 py-1 text-xs font-medium text-rose-700 hover:bg-rose-50 disabled:opacity-40 disabled:cursor-not-allowed"
-                title="Сонгосон гүйлгээг бүгдийг устгах"
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-                Устгах
-              </button>
-              <button
-                onClick={clearSelection}
-                className="inline-flex items-center gap-1 text-xs text-slate-500 hover:text-slate-800"
-                title="Сонголтыг арилгах"
-              >
-                <X className="w-3 h-3" />
-                Цэвэрлэх
-              </button>
-            </div>
+            <button
+              onClick={clearSelection}
+              className="ml-auto inline-flex items-center gap-1 text-xs text-slate-500 hover:text-slate-800"
+              title="Сонголтыг арилгах"
+            >
+              <X className="w-3 h-3" />
+              Цэвэрлэх
+            </button>
           </div>
         </div>
       )}

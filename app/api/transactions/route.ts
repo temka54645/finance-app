@@ -106,24 +106,7 @@ export async function PATCH(req: NextRequest) {
 export async function DELETE(req: NextRequest) {
   try {
     const userId = await requireUserId();
-    const body = await req.json();
-
-    // Bulk delete: { ids: string[] }
-    if (Array.isArray(body.ids)) {
-      if (body.ids.length === 0) {
-        return NextResponse.json({ error: "ids хоосон байна" }, { status: 400 });
-      }
-      const result = await prisma.transaction.deleteMany({
-        where: { id: { in: body.ids }, statement: { userId } },
-      });
-      return NextResponse.json({ count: result.count });
-    }
-
-    // Single delete: { id: string }
-    const { id } = body;
-    if (!id) {
-      return NextResponse.json({ error: "id эсвэл ids шаардлагатай" }, { status: 400 });
-    }
+    const { id } = await req.json();
     const result = await prisma.transaction.deleteMany({
       where: { id, statement: { userId } },
     });
