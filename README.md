@@ -168,12 +168,11 @@ docker-compose.yml       # Local Postgres only
 - **Concurrency 3 → 2**: parallel upload-ийн event-loop saturation бууруулахаар. Сүүлийн файлуудын latency spike арилсан.
 - **Gap-warning false positive засвар**: Өмнө нь parallel upload-ийн дараа "anhaaruulga" буруу гарч байсан (бүх concurrent upload ижил "өмнөх" statement-ийг олж байсан). Шинэ `app/api/statements/gaps` endpoint бүх statement-ийг периодын дарааллаар sequential walk хийж зөв gap-уудыг буцаана. Client upload бүхэн дууссаны дараа нэг удаа дуудна.
 
-### 2026-05-25 — Statements bulk-delete (test-only UI)
+### 2026-05-27 — Statements bulk-delete (production)
 
-- `components/StatementsManager.tsx`-д multi-select checkbox + bulk-delete action bar нэмсэн.
-- `NEXT_PUBLIC_TEST_MODE=1` env var-аар gating хийсэн — production build-д огт харагдахгүй.
-- `app/api/statements` DELETE handler `{ ids: string[] }` body-г дэмждэг болсон (single `id` ч хэвээр ажиллана).
-- Локал хөгжүүлэлтэд том дата цэвэрлэхэд ашиглана.
+- `components/StatementsManager.tsx`-д multi-select checkbox + bulk-delete action bar production-д идэвхтэй болов (`TEST_MODE` gate-ийг арилгасан).
+- `app/api/statements` DELETE handler `{ ids: string[] }` body-г дэмждэг (single `id` ч хэвээр ажиллана), tenant scope `statement.userId`-аар хамгаалсан.
+- Хуулга устгахад түүний бүх гүйлгээ ч хамт устана.
 
 ### 2026-05-25 — Upload performance
 

@@ -11,11 +11,6 @@ interface Statement {
   _count: { transactions: number };
 }
 
-// Зөвхөн test/local орчинд multi-select & bulk-delete UI харуулна.
-// .env.local дотор `NEXT_PUBLIC_TEST_MODE=1` тавьсан үед идэвхтэй.
-// Production .env-д энэ var тавиагүй тул feature production-д харагдахгүй.
-const TEST_MODE = process.env.NEXT_PUBLIC_TEST_MODE === "1";
-
 export default function StatementsManager() {
   const [statements, setStatements] = useState<Statement[]>([]);
   const [loading, setLoading] = useState(false);
@@ -132,26 +127,24 @@ export default function StatementsManager() {
     <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
       <div className="px-4 py-3 border-b border-gray-200 flex items-center justify-between gap-3">
         <div className="flex items-center gap-3 min-w-0">
-          {TEST_MODE && (
-            <button
-              type="button"
-              onClick={toggleAll}
-              className="text-gray-500 hover:text-gray-700 flex-shrink-0"
-              title={allSelected ? "Бүгдийг сонголтоос гаргах" : "Бүгдийг сонгох"}
-            >
-              {allSelected
-                ? <CheckSquare className="w-4 h-4" />
-                : <Square className="w-4 h-4" />}
-            </button>
-          )}
+          <button
+            type="button"
+            onClick={toggleAll}
+            className="text-gray-500 hover:text-gray-700 flex-shrink-0"
+            title={allSelected ? "Бүгдийг сонголтоос гаргах" : "Бүгдийг сонгох"}
+          >
+            {allSelected
+              ? <CheckSquare className="w-4 h-4" />
+              : <Square className="w-4 h-4" />}
+          </button>
           <p className="text-sm font-semibold text-gray-700">
             Нийт {statements.length} хуулга
-            {TEST_MODE && selectedIds.size > 0 && (
+            {selectedIds.size > 0 && (
               <span className="ml-2 text-blue-600">· {selectedIds.size} сонгосон</span>
             )}
           </p>
         </div>
-        {TEST_MODE && selectedIds.size > 0 ? (
+        {selectedIds.size > 0 ? (
           <button
             type="button"
             onClick={handleBulkDelete}
@@ -177,18 +170,16 @@ export default function StatementsManager() {
               key={s.id}
               className={`px-4 py-3 flex items-center gap-3 hover:bg-gray-50 ${checked ? "bg-blue-50/50" : ""}`}
             >
-              {TEST_MODE && (
-                <button
-                  type="button"
-                  onClick={() => toggleOne(s.id)}
-                  className="text-gray-400 hover:text-blue-600 flex-shrink-0"
-                  title={checked ? "Сонголтоос гаргах" : "Сонгох"}
-                >
-                  {checked
-                    ? <CheckSquare className="w-4 h-4 text-blue-600" />
-                    : <Square className="w-4 h-4" />}
-                </button>
-              )}
+              <button
+                type="button"
+                onClick={() => toggleOne(s.id)}
+                className="text-gray-400 hover:text-blue-600 flex-shrink-0"
+                title={checked ? "Сонголтоос гаргах" : "Сонгох"}
+              >
+                {checked
+                  ? <CheckSquare className="w-4 h-4 text-blue-600" />
+                  : <Square className="w-4 h-4" />}
+              </button>
               <div className="w-9 h-9 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0">
                 <FileText className="w-4 h-4 text-blue-600" />
               </div>
