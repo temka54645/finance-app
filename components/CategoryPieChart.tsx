@@ -17,6 +17,8 @@ interface Props {
   type: "income" | "expense";
   title: string;
   userType?: UserType;
+  /** Гадна карт (border/bg)-гүйгээр шигтгэн харуулна. */
+  bare?: boolean;
 }
 
 function fmt(v: number) {
@@ -35,6 +37,7 @@ export default function CategoryPieChart({
   type,
   title,
   userType = "personal",
+  bare = false,
 }: Props) {
   // categories.ts-аас icon авна (зөвхөн тухайн userType-ийн)
   const iconMap = useMemo(() => {
@@ -102,7 +105,13 @@ export default function CategoryPieChart({
 
   if (data.length === 0) {
     return (
-      <div className="bg-white border border-gray-200 rounded-xl p-6 flex flex-col items-center justify-center min-h-[200px]">
+      <div
+        className={
+          bare
+            ? "flex min-h-[120px] flex-col items-center justify-center"
+            : "bg-white border border-gray-200 rounded-xl p-6 flex flex-col items-center justify-center min-h-[200px]"
+        }
+      >
         <p className="text-sm font-semibold text-gray-600 mb-1">{title}</p>
         <p className="text-xs text-gray-400">Мэдээлэл байхгүй</p>
       </div>
@@ -110,7 +119,7 @@ export default function CategoryPieChart({
   }
 
   return (
-    <div className="bg-white border border-gray-200 rounded-xl p-4 flex flex-col gap-3">
+    <div className={bare ? "flex flex-col gap-3" : "bg-white border border-gray-200 rounded-xl p-4 flex flex-col gap-3"}>
       {/* Header */}
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-semibold text-gray-700">{title}</h3>

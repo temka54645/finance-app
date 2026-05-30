@@ -9,21 +9,42 @@ interface Row {
   total: number;
 }
 
+interface CatRow {
+  year: number;
+  category: string;
+  type: string;
+  total: number;
+  count: number;
+}
+
 export async function GET() {
   try {
     const userId = await requireUserId();
 
-    const rows = await prisma.$queryRaw<Row[]>`
-      SELECT EXTRACT(YEAR FROM t."date")::int AS year,
-             EXTRACT(MONTH FROM t."date")::int AS month,
-             t."type" AS type,
-             SUM(t."amount")::float AS total
-      FROM "Transaction" t
-      JOIN "Statement" s ON s."id" = t."statementId"
-      WHERE s."userId" = ${userId}
-      GROUP BY 1, 2, 3
-      ORDER BY 1, 2
-    `;
+    const [rows, catRows] = await Promise.all([
+      prisma.$queryRaw<Row[]>`
+        SELECT EXTRACT(YEAR FROM t."date")::int AS year,
+               EXTRACT(MONTH FROM t."date")::int AS month,
+               t."type" AS type,
+               SUM(t."amount")::float AS total
+        FROM "Transaction" t
+        JOIN "Statement" s ON s."id" = t."statementId"
+        WHERE s."userId" = ${userId}
+        GROUP BY 1, 2, 3
+        ORDER BY 1, 2
+      `,
+      prisma.$queryRaw<CatRow[]>`
+        SELECT EXTRACT(YEAR FROM t."date")::int AS year,
+               COALESCE(NULLIF(btrim(t."category"), ''), 'Ангилаагүй') AS category,
+               t."type" AS type,
+               SUM(t."amount")::float AS total,
+               COUNT(*)::int AS count
+        FROM "Transaction" t
+        JOIN "Statement" s ON s."id" = t."statementId"
+        WHERE s."userId" = ${userId}
+        GROUP BY 1, 2, 3
+      `,
+    ]);
 
     // (year, month) бүрийн орлого/зарлагыг нэгтгэнэ.
     const map = new Map<string, { year: number; month: number; income: number; expense: number }>();
@@ -42,7 +63,7 @@ export async function GET() {
     );
     const years = Array.from(yearSet).sort((a, b) => b - a); // сүүлийн жил эхэнд
 
-    return NextResponse.json({ series, years });
+    return NextResponse.json({ series, years, byCategory: catRows });
   } catch (err) {
     if (err instanceof UnauthorizedError) {
       return NextResponse.json({ error: err.message }, { status: 401 });

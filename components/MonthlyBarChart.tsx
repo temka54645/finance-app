@@ -2,13 +2,24 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
+import { useSession } from "next-auth/react";
 import { useDataRefresh } from "@/lib/use-data-refresh";
+import CategoryPieChart from "@/components/CategoryPieChart";
+import type { UserType } from "@/lib/categories";
 
 interface SeriesRow {
   year: number;
   month: number; // 1-12
   income: number;
   expense: number;
+}
+
+interface CatRow {
+  year: number;
+  category: string;
+  type: string;
+  total: number;
+  count: number;
 }
 
 interface Props {
@@ -28,7 +39,10 @@ function fmtFull(v: number | string | undefined) {
 }
 
 export default function MonthlyBarChart({ readOnly = false }: Props) {
+  const { data: session } = useSession();
+  const userType = ((session?.user as { userType?: UserType } | undefined)?.userType) ?? "personal";
   const [series, setSeries] = useState<SeriesRow[]>([]);
+  const [byCategory, setByCategory] = useState<CatRow[]>([]);
   const [years, setYears] = useState<number[]>([]);
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [loading, setLoading] = useState(true);
@@ -38,6 +52,7 @@ export default function MonthlyBarChart({ readOnly = false }: Props) {
     const data = await res.json();
     const yrs: number[] = data.years ?? [];
     setSeries(data.series ?? []);
+    setByCategory(data.byCategory ?? []);
     setYears(yrs);
     // Анхдагчаар хамгийн сүүлийн жилийг сонгоно (өмнөх сонголтыг хадгална).
     setSelected(prev => {
@@ -82,6 +97,25 @@ export default function MonthlyBarChart({ readOnly = false }: Props) {
   }, [series, selected]);
 
   const hasData = data.some(d => d["Орлого"] > 0 || d["Зарлага"] > 0);
+
+  // Сонгосон жилүүдийн ангиллыг нэгтгэж pie chart-д бэлдэнэ.
+  const catItems = useMemo(() => {
+    const acc = new Map<string, { category: string; type: string; amount: number; count: number }>();
+    for (const r of byCategory) {
+      if (!selected.has(r.year)) continue;
+      const key = `${r.category}|${r.type}`;
+      const e = acc.get(key) ?? { category: r.category, type: r.type, amount: 0, count: 0 };
+      e.amount += r.total;
+      e.count += r.count;
+      acc.set(key, e);
+    }
+    return Array.from(acc.values()).map(e => ({
+      category: e.category,
+      type: e.type,
+      _sum: { amount: e.amount },
+      _count: e.count,
+    }));
+  }, [byCategory, selected]);
 
   if (!loading && years.length === 0) return null;
 
@@ -147,6 +181,26 @@ export default function MonthlyBarChart({ readOnly = false }: Props) {
           </BarChart>
         </ResponsiveContainer>
       </div>
+
+      {/* Доод хэсэг — сонгосон жилүүдийн орлого/зарлагын ангиллын pie chart */}
+      {hasData && (
+        <div className="mt-4 grid gap-4 border-t border-slate-100 pt-4 sm:grid-cols-2">
+          <CategoryPieChart
+            byCategory={catItems}
+            type="income"
+            title="Орлогын ангилал"
+            userType={userType}
+            bare
+          />
+          <CategoryPieChart
+            byCategory={catItems}
+            type="expense"
+            title="Зарлагын ангилал"
+            userType={userType}
+            bare
+          />
+        </div>
+      )}
     </div>
   );
 }
