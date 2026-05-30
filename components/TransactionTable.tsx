@@ -694,6 +694,7 @@ export default function TransactionTable({ transactions, onUpdate }: Props) {
                 </th>
                 <th className="px-4 py-3 text-left">{sortHeader("date", "Огноо")}</th>
                 <th className="px-4 py-3 text-left">{sortHeader("description", "Тайлбар")}</th>
+                <th className="px-4 py-3 text-left">Харьцсан данс</th>
                 <th className="px-4 py-3 text-left">Төрөл</th>
                 <th className="px-4 py-3 text-left">{sortHeader("category", "Категори")}</th>
                 <th className="px-4 py-3 text-right">{sortHeader("amount", "Дүн", "right")}</th>
@@ -727,15 +728,19 @@ export default function TransactionTable({ transactions, onUpdate }: Props) {
                   </td>
                   <td className="px-4 py-3 max-w-xs">
                     <p className="truncate text-gray-800" title={t.description}>{t.description}</p>
-                    {t.counterparty && (
-                      <p className="truncate text-[11px] text-slate-500 mt-0.5" title={t.counterparty}>
-                        <span className="text-slate-400">↔</span> {t.counterparty}
-                      </p>
-                    )}
                     {showBankFilter && (
                       <div className="mt-1">
                         <BankBadge bankName={t.statement?.bankName ?? null} size="sm" />
                       </div>
+                    )}
+                  </td>
+                  <td className="px-4 py-3 max-w-[12rem]">
+                    {t.counterparty ? (
+                      <span className="block truncate text-xs text-slate-600" title={t.counterparty}>
+                        {t.counterparty}
+                      </span>
+                    ) : (
+                      <span className="text-slate-300 text-xs">—</span>
                     )}
                   </td>
                   <td className="px-4 py-3">
