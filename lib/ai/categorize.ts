@@ -65,21 +65,33 @@ async function categorizeBatch(
   incomeCats: string[],
   expenseCats: string[]
 ): Promise<CategorizationResult[]> {
-  const prompt = `Монгол банкны гүйлгээний категори тодорхойл. Эерэг дүн = орлого, сөрөг дүн = зарлага (энэ нь parser-аас тогтоогдсон, өөрчилж болохгүй).
+  // ── Хурдны оновчлол ──
+  // LLM-ийн latency гол төлөв ГАРАЛТЫН token-ы тоогоор тодорхойлогдоно.
+  // Тиймээс AI-аар урт категорийн нэр + "type"-ийг бүтнээр буцаалгахын оронд
+  // зөвхөн нэг ДУГААР (катологийн индекс) буцаалгана — гаралт 3-4 дахин багасч,
+  // ai алхам ихээхэн хурдасна. `type` нь amount-ийн тэмдгээр аль хэдийн тогтсон
+  // тул AI-аас огт асуухгүй; зөвхөн индексийг каталог + type-аар баталгаажуулна.
+  const catalog: Array<{ category: string; type: "income" | "expense" }> = [
+    ...incomeCats.map(c => ({ category: c, type: "income" as const })),
+    ...expenseCats.map(c => ({ category: c, type: "expense" as const })),
+  ];
+  const catalogText = catalog.map((c, i) => `${i}:${c.category}`).join("\n");
+  const incomeRange = `0-${incomeCats.length - 1}`;
+  const expenseRange = `${incomeCats.length}-${catalog.length - 1}`;
 
-Орлогын категори: ${incomeCats.join(", ")}
-Зарлагын категори: ${expenseCats.join(", ")}
+  const prompt = `Монгол банкны гүйлгээ бүрт хамгийн тохирох категорийн ДУГААРыг сонго.
+
+Категориуд (дугаар:нэр):
+${catalogText}
+
+Орлогын категори = дугаар ${incomeRange}. Зарлагын категори = дугаар ${expenseRange}.
+Гүйлгээ бүрт t="i" (орлого) бол ${incomeRange} мужаас, t="e" (зарлага) бол ${expenseRange} мужаас сонгоно.
 
 Гүйлгээнүүд:
-${JSON.stringify(batch.map((t, i) => ({ i, desc: t.description, amount: t.amount })))}
+${JSON.stringify(batch.map((t, i) => ({ i, t: t.amount >= 0 ? "i" : "e", desc: t.description })))}
 
-Дүрэм:
-- Хэрэв amount >= 0 → type заавал "income", категори орлогын жагсаалтаас
-- Хэрэв amount < 0 → type заавал "expense", категори зарлагын жагсаалтаас
-- Тайлбараас хамгийн тохиромжтой категори сонг
-
-Зөвхөн JSON массив буцаа:
-[{"type":"income","category":"Цалин"},{"type":"expense","category":"Хоол, ресторан"}]`;
+Зөвхөн дугааруудын JSON массивыг гүйлгээний дарааллаар буцаа, өөр юу ч бичихгүй.
+Жишээ: [3,17,2,9]`;
 
   const response = await Promise.race([
     client.messages.create({
@@ -96,9 +108,20 @@ ${JSON.stringify(batch.map((t, i) => ({ i, desc: t.description, amount: t.amount
   const jsonMatch = text.match(/\[[\s\S]*\]/);
   if (!jsonMatch) throw new Error("JSON parse failed");
 
-  const parsed = JSON.parse(jsonMatch[0]) as CategorizationResult[];
-  if (parsed.length !== batch.length) throw new Error("Length mismatch");
-  return parsed;
+  const indices = JSON.parse(jsonMatch[0]) as unknown[];
+  if (indices.length !== batch.length) throw new Error("Length mismatch");
+
+  return batch.map((t, i) => {
+    const type: "income" | "expense" = t.amount >= 0 ? "income" : "expense";
+    const raw = indices[i];
+    const n = typeof raw === "number" ? raw : Number(raw);
+    const picked = Number.isInteger(n) ? catalog[n] : undefined;
+    // Индекс хүчинтэй ба type таарвал AI-н сонголтыг авна, эс бөгөөс fallback.
+    if (picked && picked.type === type) {
+      return { type, category: picked.category };
+    }
+    return { type, category: type === "income" ? "Бусад орлого" : "Бусад зарлага" };
+  });
 }
 
 export interface CategorizeOptions {
