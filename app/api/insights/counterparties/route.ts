@@ -1,5 +1,6 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { Prisma } from "@/app/generated/prisma/client";
 import { requireUserId, UnauthorizedError } from "@/lib/auth-helpers";
 
 // Бүх хугацааны харьцагч (counterparty) дээр суурилсан үзүүлэлтүүд.
@@ -31,9 +32,40 @@ interface RecurringRow {
   sd: number;
 }
 
-export async function GET() {
+function monthRange(year: number, month: number) {
+  return {
+    gte: new Date(Date.UTC(year, month - 1, 1)),
+    lt: new Date(Date.UTC(year, month, 1)),
+  };
+}
+
+function yearRange(year: number) {
+  return {
+    gte: new Date(Date.UTC(year, 0, 1)),
+    lt: new Date(Date.UTC(year + 1, 0, 1)),
+  };
+}
+
+export async function GET(req: NextRequest) {
   try {
     const userId = await requireUserId();
+
+    const { searchParams } = new URL(req.url);
+    const yearParam = searchParams.get("year");
+    const year = yearParam ? Number(yearParam) : null;
+    const monthParam = searchParams.get("month");
+    const month = monthParam ? Number(monthParam) : null;
+
+    // Хугацааны хязгаар (сонгосон бол) — бүх query-д нэмэх SQL fragment.
+    let range: { gte: Date; lt: Date } | null = null;
+    if (year && !isNaN(year) && month && !isNaN(month) && month >= 1 && month <= 12) {
+      range = monthRange(year, month);
+    } else if (year && !isNaN(year)) {
+      range = yearRange(year);
+    }
+    const dateFilter = range
+      ? Prisma.sql`AND t."date" >= ${range.gte} AND t."date" < ${range.lt}`
+      : Prisma.empty;
 
     const [grouped, largest, recurringRaw] = await Promise.all([
       // 1+3: харьцагч × төрөл бүрийн нийт дүн ба тоо
@@ -47,6 +79,7 @@ export async function GET() {
         WHERE s."userId" = ${userId}
           AND t."counterparty" IS NOT NULL
           AND btrim(t."counterparty") <> ''
+          ${dateFilter}
         GROUP BY t."counterparty", t."type"
       `,
       // 2: хамгийн өндөр дүнтэй ганц гүйлгээнүүд
@@ -59,6 +92,7 @@ export async function GET() {
         FROM "Transaction" t
         JOIN "Statement" s ON s."id" = t."statementId"
         WHERE s."userId" = ${userId}
+          ${dateFilter}
         ORDER BY t."amount" DESC
         LIMIT ${TOP_N}
       `,
@@ -75,6 +109,7 @@ export async function GET() {
         WHERE s."userId" = ${userId}
           AND t."counterparty" IS NOT NULL
           AND btrim(t."counterparty") <> ''
+          ${dateFilter}
         GROUP BY t."counterparty", t."type"
         HAVING COUNT(DISTINCT date_trunc('month', t."date")) >= 3
       `,

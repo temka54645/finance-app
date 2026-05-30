@@ -117,15 +117,28 @@ function EmptyHint({ text }: { text: string }) {
   return <p className="py-3 text-center text-xs text-slate-400">{text}</p>;
 }
 
-export default function CounterpartyInsights() {
+interface Props {
+  /** Хэрэв өгвөл тухайн сар/жилийн хүрээнд тооцоолно. Өгөхгүй бол бүх хугацаагаар. */
+  year?: number;
+  month?: number;
+}
+
+export default function CounterpartyInsights({ year, month }: Props = {}) {
   const [data, setData] = useState<InsightsData | null>(null);
   const [loading, setLoading] = useState(true);
 
+  const scoped = typeof year === "number";
+
   useEffect(() => {
     let cancelled = false;
+    setLoading(true);
     (async () => {
       try {
-        const res = await fetch("/api/insights/counterparties");
+        const qs = new URLSearchParams();
+        if (typeof year === "number") qs.set("year", String(year));
+        if (typeof month === "number") qs.set("month", String(month));
+        const suffix = qs.toString() ? `?${qs.toString()}` : "";
+        const res = await fetch(`/api/insights/counterparties${suffix}`);
         const json = await res.json();
         if (!cancelled) setData(json);
       } finally {
@@ -135,7 +148,7 @@ export default function CounterpartyInsights() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [year, month]);
 
   if (loading) {
     return (
@@ -144,7 +157,9 @@ export default function CounterpartyInsights() {
           <h3 className="text-sm font-semibold uppercase tracking-wider text-slate-700">
             Харьцагчийн шинжилгээ
           </h3>
-          <p className="mt-1 text-xs text-slate-500">Бүх хугацааны дүнгээр</p>
+          <p className="mt-1 text-xs text-slate-500">
+            {scoped ? "Энэ хугацааны дүнгээр" : "Бүх хугацааны дүнгээр"}
+          </p>
         </div>
         <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
           {[0, 1, 2, 3].map(i => (
@@ -166,7 +181,9 @@ export default function CounterpartyInsights() {
           Харьцагчийн шинжилгээ
         </h3>
         <p className="mt-1 text-xs text-slate-500">
-          Бүх хугацааны харьцсан данс дээр суурилсан үзүүлэлтүүд
+          {scoped
+            ? "Энэ хугацааны харьцсан данс дээр суурилсан үзүүлэлтүүд"
+            : "Бүх хугацааны харьцсан данс дээр суурилсан үзүүлэлтүүд"}
         </p>
       </div>
 
