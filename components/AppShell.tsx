@@ -119,7 +119,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           </div>
         </header>
 
-        <main className="mx-auto max-w-7xl space-y-6 px-5 py-6">{children}</main>
+        <main className="mx-auto max-w-7xl space-y-8 px-5 py-8">{children}</main>
       </div>
 
       {/* Upload modal */}
