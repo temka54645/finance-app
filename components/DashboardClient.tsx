@@ -6,14 +6,12 @@ import { useSession } from "next-auth/react";
 import { BarChart2, RefreshCw, Upload, X } from "lucide-react";
 import FileUpload from "@/components/FileUpload";
 import SummaryCards from "@/components/SummaryCards";
-import HighlightCards from "@/components/HighlightCards";
+import MonthlyBarChart from "@/components/MonthlyBarChart";
 import CounterpartyInsights from "@/components/CounterpartyInsights";
 import UncategorizedSection from "@/components/UncategorizedSection";
 import YearTimeline from "@/components/YearTimeline";
 import UserMenu from "@/components/UserMenu";
 import FeedbackButton from "@/components/FeedbackButton";
-
-interface Highlight { amount: number; count: number }
 
 interface OverviewReport {
   totalIncome: number;
@@ -21,12 +19,6 @@ interface OverviewReport {
   balance: number;
   incomeCount: number;
   expenseCount: number;
-  highlights: {
-    bankFees: Highlight;
-    salaryPaid: Highlight;
-    taxes: Highlight;
-    salaryReceived: Highlight;
-  };
   uncategorizedCount: number;
 }
 
@@ -146,15 +138,8 @@ export default function DashboardClient() {
           />
         )}
 
-        {/* Highlight cards */}
-        {hasData && overview?.highlights && (
-          <HighlightCards
-            bankFees={overview.highlights.bankFees}
-            salaryPaid={overview.highlights.salaryPaid}
-            taxes={overview.highlights.taxes}
-            salaryReceived={overview.highlights.salaryReceived}
-          />
-        )}
+        {/* Сарын динамик — жил тус бүрийн орлого/зарлагын сарын задаргаа */}
+        {hasData && <MonthlyBarChart />}
 
         {/* Counterparty insights — бүх хугацааны харьцагчийн үзүүлэлтүүд */}
         {hasData && <CounterpartyInsights />}
