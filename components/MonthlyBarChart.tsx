@@ -1,13 +1,19 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
+import { useDataRefresh } from "@/lib/use-data-refresh";
 
 interface SeriesRow {
   year: number;
   month: number; // 1-12
   income: number;
   expense: number;
+}
+
+interface Props {
+  /** Уншихад зориулсан горим — жил сонгох товчгүй, зөвхөн сүүлийн жилийг харуулна. */
+  readOnly?: boolean;
 }
 
 function fmtShort(n: number) {
@@ -21,30 +27,28 @@ function fmtFull(v: number | string | undefined) {
   return n.toLocaleString("mn-MN", { maximumFractionDigits: 0 }) + "₮";
 }
 
-export default function MonthlyBarChart() {
+export default function MonthlyBarChart({ readOnly = false }: Props) {
   const [series, setSeries] = useState<SeriesRow[]>([]);
   const [years, setYears] = useState<number[]>([]);
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const res = await fetch("/api/insights/monthly");
-        const data = await res.json();
-        if (cancelled) return;
-        const yrs: number[] = data.years ?? [];
-        setSeries(data.series ?? []);
-        setYears(yrs);
-        // Анхдагчаар хамгийн сүүлийн жилийг сонгоно.
-        setSelected(new Set(yrs.length ? [yrs[0]] : []));
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
-    return () => { cancelled = true; };
+  const fetchData = useCallback(async () => {
+    const res = await fetch("/api/insights/monthly");
+    const data = await res.json();
+    const yrs: number[] = data.years ?? [];
+    setSeries(data.series ?? []);
+    setYears(yrs);
+    // Анхдагчаар хамгийн сүүлийн жилийг сонгоно (өмнөх сонголтыг хадгална).
+    setSelected(prev => {
+      const valid = new Set(Array.from(prev).filter(y => yrs.includes(y)));
+      return valid.size ? valid : new Set(yrs.length ? [yrs[0]] : []);
+    });
+    setLoading(false);
   }, []);
+
+  useEffect(() => { fetchData(); }, [fetchData]);
+  useDataRefresh(fetchData);
 
   const toggleYear = (y: number) => {
     setSelected(prev => {
@@ -88,7 +92,7 @@ export default function MonthlyBarChart() {
           <h3 className="text-sm font-semibold text-slate-700">Сарын динамик</h3>
           {!hasData && !loading && <span className="text-xs text-slate-400">Гүйлгээгүй</span>}
         </div>
-        {years.length > 0 && (
+        {!readOnly && years.length > 0 && (
           <div className="flex items-center gap-1.5 flex-wrap">
             {years.length > 1 && (
               <button

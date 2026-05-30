@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useCallback, useState, useEffect } from "react";
 import {
   TrendingUp,
   TrendingDown,
@@ -9,6 +9,7 @@ import {
   ArrowUpRight,
   ArrowDownRight,
 } from "lucide-react";
+import { useDataRefresh } from "@/lib/use-data-refresh";
 
 interface TopRow {
   counterparty: string;
@@ -129,26 +130,22 @@ export default function CounterpartyInsights({ year, month }: Props = {}) {
 
   const scoped = typeof year === "number";
 
-  useEffect(() => {
-    let cancelled = false;
-    setLoading(true);
-    (async () => {
-      try {
-        const qs = new URLSearchParams();
-        if (typeof year === "number") qs.set("year", String(year));
-        if (typeof month === "number") qs.set("month", String(month));
-        const suffix = qs.toString() ? `?${qs.toString()}` : "";
-        const res = await fetch(`/api/insights/counterparties${suffix}`);
-        const json = await res.json();
-        if (!cancelled) setData(json);
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
+  const fetchData = useCallback(async () => {
+    const qs = new URLSearchParams();
+    if (typeof year === "number") qs.set("year", String(year));
+    if (typeof month === "number") qs.set("month", String(month));
+    const suffix = qs.toString() ? `?${qs.toString()}` : "";
+    const res = await fetch(`/api/insights/counterparties${suffix}`);
+    const json = await res.json();
+    setData(json);
+    setLoading(false);
   }, [year, month]);
+
+  useEffect(() => {
+    setLoading(true);
+    fetchData();
+  }, [fetchData]);
+  useDataRefresh(fetchData);
 
   if (loading) {
     return (

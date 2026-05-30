@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { Loader2, Upload } from "lucide-react";
 import YearAccordionRow from "./YearAccordionRow";
 import FileUpload from "./FileUpload";
+import { useDataRefresh } from "@/lib/use-data-refresh";
 
 interface BankData {
   bankName: string | null;
@@ -77,6 +78,9 @@ export default function YearTimeline({ onChange }: Props) {
   useEffect(() => {
     fetchTimeline();
   }, [fetchTimeline]);
+
+  // Хуулга орох / шинэчлэх үед timeline-ийг дахин татна.
+  useDataRefresh(fetchTimeline);
 
   // Хэрэглэгч сараас буцаж ирсэн бол тэр жил рүү scroll хийнэ
   useEffect(() => {
