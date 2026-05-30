@@ -72,6 +72,12 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           </div>
         </Link>
         <nav className="flex flex-1 flex-col gap-1 px-3 py-4">{navLinks("side")}</nav>
+        {/* Профайл — зүүн доод буланд */}
+        {session?.user && (
+          <div className="border-t border-slate-200 p-3">
+            <UserMenu email={session.user.email ?? ""} name={session.user.name} variant="sidebar" />
+          </div>
+        )}
       </aside>
 
       {/* Контентын хэсэг */}
@@ -103,14 +109,17 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                 <Upload className="h-4 w-4" />
                 <span className="hidden sm:inline">Файл оруулах</span>
               </button>
+              {/* Профайл — десктоп дээр зүүн доод буланд, гар утсан дээр энд */}
               {session?.user && (
-                <UserMenu email={session.user.email ?? ""} name={session.user.name} />
+                <div className="md:hidden">
+                  <UserMenu email={session.user.email ?? ""} name={session.user.name} />
+                </div>
               )}
             </div>
           </div>
         </header>
 
-        <main className="mx-auto max-w-7xl space-y-8 px-5 py-8">{children}</main>
+        <main className="mx-auto max-w-7xl space-y-6 px-5 py-6">{children}</main>
       </div>
 
       {/* Upload modal */}

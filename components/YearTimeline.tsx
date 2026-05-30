@@ -35,6 +35,8 @@ interface YearData {
 
 interface Props {
   onChange: () => void;
+  /** Сонгосон жилүүд. Хоосон/өгөгдөөгүй бол бүгдийг харуулна. */
+  years?: number[];
 }
 
 const STORAGE_KEY = "finmate.expandedYears";
@@ -58,7 +60,7 @@ function saveExpandedYears(set: Set<number>) {
   } catch {}
 }
 
-export default function YearTimeline({ onChange }: Props) {
+export default function YearTimeline({ onChange, years }: Props) {
   const [timeline, setTimeline] = useState<YearData[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedYears, setExpandedYears] = useState<Set<number>>(loadExpandedYears);
@@ -147,9 +149,20 @@ export default function YearTimeline({ onChange }: Props) {
     );
   }
 
+  const filterSet = years && years.length > 0 ? new Set(years) : null;
+  const visible = filterSet ? timeline.filter(yr => filterSet.has(yr.year)) : timeline;
+
+  if (visible.length === 0) {
+    return (
+      <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-8 text-center">
+        <p className="text-sm text-slate-500">Сонгосон жилд тохирох мэдээлэл алга</p>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-3">
-      {timeline.map(yr => (
+      {visible.map(yr => (
         <YearAccordionRow
           key={yr.year}
           data={yr}

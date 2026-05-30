@@ -122,13 +122,16 @@ interface Props {
   /** Хэрэв өгвөл тухайн сар/жилийн хүрээнд тооцоолно. Өгөхгүй бол бүх хугацаагаар. */
   year?: number;
   month?: number;
+  /** Нягт горим — нэг цонхонд багтаахаар цөөн мөр харуулна (dashboard). */
+  compact?: boolean;
 }
 
-export default function CounterpartyInsights({ year, month }: Props = {}) {
+export default function CounterpartyInsights({ year, month, compact = false }: Props = {}) {
   const [data, setData] = useState<InsightsData | null>(null);
   const [loading, setLoading] = useState(true);
 
   const scoped = typeof year === "number";
+  const limit = compact ? 4 : Infinity;
 
   const fetchData = useCallback(async () => {
     const qs = new URLSearchParams();
@@ -194,7 +197,7 @@ export default function CounterpartyInsights({ year, month }: Props = {}) {
         >
           {data.topIncome.length ? (
             <ul className="divide-y divide-slate-100">
-              {data.topIncome.map((r, i) => (
+              {data.topIncome.slice(0, limit).map((r, i) => (
                 <RankRow
                   key={r.counterparty}
                   rank={i + 1}
@@ -218,7 +221,7 @@ export default function CounterpartyInsights({ year, month }: Props = {}) {
         >
           {data.topExpense.length ? (
             <ul className="divide-y divide-slate-100">
-              {data.topExpense.map((r, i) => (
+              {data.topExpense.slice(0, limit).map((r, i) => (
                 <RankRow
                   key={r.counterparty}
                   rank={i + 1}
@@ -242,7 +245,7 @@ export default function CounterpartyInsights({ year, month }: Props = {}) {
         >
           {data.largest.length ? (
             <ul className="divide-y divide-slate-100">
-              {data.largest.map((r, i) => (
+              {data.largest.slice(0, limit).map((r, i) => (
                 <li key={i} className="flex items-center gap-3 py-1.5">
                   <span className="flex-shrink-0">
                     {r.type === "income" ? (
@@ -281,7 +284,7 @@ export default function CounterpartyInsights({ year, month }: Props = {}) {
         >
           {data.mostFrequent.length ? (
             <ul className="divide-y divide-slate-100">
-              {data.mostFrequent.map((r, i) => (
+              {data.mostFrequent.slice(0, limit).map((r, i) => (
                 <RankRow
                   key={r.counterparty}
                   rank={i + 1}
@@ -297,8 +300,8 @@ export default function CounterpartyInsights({ year, month }: Props = {}) {
         </Card>
       </div>
 
-      {/* 4 — Тогтмол/давтагдсан төлбөр (бүтэн өргөн) */}
-      {data.recurring.length > 0 && (
+      {/* 4 — Тогтмол/давтагдсан төлбөр (бүтэн өргөн) — нягт горимд нуугдана */}
+      {!compact && data.recurring.length > 0 && (
         <div className="mt-3">
           <Card
             title="Тогтмол / давтагдсан төлбөр"

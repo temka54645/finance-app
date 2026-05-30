@@ -8,9 +8,11 @@ import { signOut, useSession } from "next-auth/react";
 interface Props {
   email: string;
   name?: string | null;
+  /** "header" — баруун дээрээс доош нээнэ. "sidebar" — зүүн доороос дээш нээнэ. */
+  variant?: "header" | "sidebar";
 }
 
-export default function UserMenu({ email, name }: Props) {
+export default function UserMenu({ email, name, variant = "header" }: Props) {
   const { data: session } = useSession();
   const userType = (session?.user as { userType?: string | null } | undefined)?.userType;
   const isBusiness = userType === "business";
@@ -19,6 +21,7 @@ export default function UserMenu({ email, name }: Props) {
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const display = name || email;
+  const isSidebar = variant === "sidebar";
 
   // Click-outside + Escape — document-level listener тул z-index давтлагад нөлөөлөхгүй
   useEffect(() => {
@@ -45,22 +48,30 @@ export default function UserMenu({ email, name }: Props) {
     <div className="relative" ref={containerRef}>
       <button
         onClick={() => setOpen(o => !o)}
-        className="flex items-center gap-2 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-100 rounded-lg transition-all duration-150 hover:scale-[1.02]"
+        className={
+          isSidebar
+            ? "flex w-full items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-xl transition-colors"
+            : "flex items-center gap-2 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-100 rounded-lg transition-all duration-150 hover:scale-[1.02]"
+        }
       >
-        <div className="w-7 h-7 bg-blue-100 rounded-full flex items-center justify-center transition-transform duration-200">
+        <div className="w-7 h-7 flex-shrink-0 bg-blue-100 rounded-full flex items-center justify-center transition-transform duration-200">
           {isBusiness ? (
             <Building2 className="w-4 h-4 text-blue-600" />
           ) : (
             <UserIcon className="w-4 h-4 text-blue-600" />
           )}
         </div>
-        <span className="max-w-[140px] truncate">{display}</span>
-        <ChevronDown className={`w-3 h-3 text-gray-400 transition-transform duration-200 ${open ? "rotate-180" : ""}`} />
+        <span className={`truncate ${isSidebar ? "flex-1 text-left" : "max-w-[140px]"}`}>{display}</span>
+        <ChevronDown className={`w-3 h-3 flex-shrink-0 text-gray-400 transition-transform duration-200 ${open ? "rotate-180" : ""}`} />
       </button>
 
       {open && (
         <div
-          className="absolute right-0 top-full mt-1 w-64 bg-white border border-gray-200 rounded-lg shadow-lg z-30 py-1 origin-top-right animate-pop-in"
+          className={
+            isSidebar
+              ? "absolute bottom-full left-0 mb-1 w-full min-w-[15rem] bg-white border border-gray-200 rounded-lg shadow-lg z-30 py-1 origin-bottom-left animate-pop-in"
+              : "absolute right-0 top-full mt-1 w-64 bg-white border border-gray-200 rounded-lg shadow-lg z-30 py-1 origin-top-right animate-pop-in"
+          }
         >
           <div className="px-3 py-2 border-b border-gray-100">
             <p className="text-xs text-gray-400">Нэвтэрсэн</p>
