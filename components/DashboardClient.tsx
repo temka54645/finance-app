@@ -7,6 +7,7 @@ import { BarChart2, RefreshCw, Upload, X } from "lucide-react";
 import FileUpload from "@/components/FileUpload";
 import SummaryCards from "@/components/SummaryCards";
 import HighlightCards from "@/components/HighlightCards";
+import CounterpartyInsights from "@/components/CounterpartyInsights";
 import UncategorizedSection from "@/components/UncategorizedSection";
 import YearTimeline from "@/components/YearTimeline";
 import UserMenu from "@/components/UserMenu";
@@ -154,6 +155,9 @@ export default function DashboardClient() {
             salaryReceived={overview.highlights.salaryReceived}
           />
         )}
+
+        {/* Counterparty insights — бүх хугацааны харьцагчийн үзүүлэлтүүд */}
+        {hasData && <CounterpartyInsights />}
 
         {/* Uncategorized alert */}
         {overview && overview.uncategorizedCount > 0 && (
