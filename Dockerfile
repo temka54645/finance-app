@@ -13,6 +13,13 @@ RUN npm ci
 FROM node:20-alpine AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
+# Cache-bust: commit бүрт source-COPY ба build-ийг ЗААВАЛ дахин ажиллуулна.
+# Depot/buildkit-ийн layer cache `COPY . .`-г хуучин агуулгаар буруугаар reuse
+# хийж, шинэ код image-д орохгүй (production хуучин build-аар гацах) асуудлаас
+# сэргийлнэ. GIT_SHA нь commit бүрт өөрчлөгддөг тул доорх RUN cache-миссэлж,
+# араас нь `COPY . .` ба `npm run build` мөн дахин ажиллана.
+ARG GIT_SHA=dev
+RUN echo "Building source for commit: $GIT_SHA"
 COPY . .
 RUN npx prisma generate
 ENV NEXT_TELEMETRY_DISABLED=1
