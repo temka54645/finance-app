@@ -22,9 +22,8 @@ type ItemStatus = "pending" | "uploading" | "done" | "error" | "limit";
 interface ServerTiming {
   total: number;
   parse: number;
-  ai: number;
+  categorize: number;
   db: number;
-  allowAi: boolean;
 }
 
 interface QueueItem {
@@ -387,9 +386,8 @@ export default function FileUpload({ onSuccess, onRequestClose, compact = false 
                   <div className="mt-1 text-[10px] text-slate-500 font-mono">
                     ⏱ {item.clientMs ?? "?"}ms (server {item.serverTiming.total}ms ·
                     parse {item.serverTiming.parse} ·
-                    ai {item.serverTiming.ai} ·
-                    db {item.serverTiming.db}
-                    {!item.serverTiming.allowAi && " · ai=off"})
+                    cat {item.serverTiming.categorize} ·
+                    db {item.serverTiming.db})
                   </div>
                 )}
               </li>

@@ -6,8 +6,7 @@ import { parseCSV, extractRawRows, type ParsedTransaction } from "@/lib/parsers/
 import { parseWithBankDetection, type StatementMeta } from "@/lib/parsers/banks";
 import { categorizeTransactions } from "@/lib/ai/categorize";
 import { aiExtractTransactions } from "@/lib/ai/extract";
-import { assertWithinLimit, LimitExceededError, isLimitBypassed } from "@/lib/usage";
-import { getTier } from "@/lib/plans";
+import { assertWithinLimit, LimitExceededError } from "@/lib/usage";
 
 export const maxDuration = 120;
 export const runtime = "nodejs";
@@ -63,34 +62,28 @@ export async function POST(req: NextRequest) {
       }, { status: 422 });
     }
 
-    // Хэрэглэгчийн төрөл + plan — AI categorization plan-аар хязгаарлагдсан эсэхийг шалгана
+    // Хэрэглэгчийн төрөл — категорийн каталог personal/business-аас хамаарна.
     const user = await prisma.user.findUnique({
       where: { id: userId },
-      select: { userType: true, plan: true },
+      select: { userType: true },
     });
     const userType = (user?.userType === "business" || user?.userType === "personal")
       ? user.userType
       : "personal";
 
-    // free tier бол AI ашиглахгүй, зөвхөн regex/keyword fallback.
-    // Beta/тестийн үед bypass хийнэ — бүгдэд AI нээлттэй.
-    // LOCAL_DISABLE_AI=1 үед локал тестэд AI бүхэлдээ хаалттай — хурдан regex fallback.
-    const allowAi = process.env.LOCAL_DISABLE_AI === "1"
-      ? false
-      : (isLimitBypassed() || getTier(user?.plan).limits.aiCategorization);
-
-    // ── AI categorization ──
+    // ── Категоричлол ──
+    // AI ангилал huulga oruulah үед БҮРЭН хасагдсан (хэрэгцээгүй гэж үзсэн).
+    // Зөвхөн keyword дүрэм + regex fallback — хурдан, гадаад API-аас хамааралгүй.
     // Gap-detection-ийг энд хийхгүй: parallel upload-ийн үед зэрэг ажиллаж буй
     // request-үүд бие биеийнхээ commit-ийг хараагүй учир false-positive өгдөг.
     // Үүнийг тусдаа `/api/statements/gaps` endpoint-аар бүх upload дууссаны
     // дараа нэг л удаа гүйцэтгэнэ (client-ээс trigger хийнэ).
-    const tAiStart = performance.now();
-    const categorized = await categorizeTransactions(
+    const tCatStart = performance.now();
+    const categorized = categorizeTransactions(
       parsed.map(t => ({ description: t.description, amount: t.amount })),
-      userType,
-      { useAi: allowAi }
+      userType
     );
-    const tAiEnd = performance.now();
+    const tCatEnd = performance.now();
 
     const finalBankName = bankNameInput || detectedBank;
 
@@ -138,9 +131,9 @@ export async function POST(req: NextRequest) {
     console.log(
       `[upload] ${fileName} total=${tTotal | 0}ms ` +
       `parse=${(tParseEnd - tParseStart) | 0}ms ` +
-      `ai=${(tAiEnd - tAiStart) | 0}ms ` +
+      `categorize=${(tCatEnd - tCatStart) | 0}ms ` +
       `db=${(tDbEnd - tDbStart) | 0}ms ` +
-      `tx=${parsed.length} allowAi=${allowAi}`
+      `tx=${parsed.length}`
     );
 
     return NextResponse.json({
@@ -159,9 +152,8 @@ export async function POST(req: NextRequest) {
       timing: {
         total: Math.round(tTotal),
         parse: Math.round(tParseEnd - tParseStart),
-        ai: Math.round(tAiEnd - tAiStart),
+        categorize: Math.round(tCatEnd - tCatStart),
         db: Math.round(tDbEnd - tDbStart),
-        allowAi,
       },
     });
   } catch (err) {
