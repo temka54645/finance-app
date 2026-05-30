@@ -4,9 +4,10 @@ import type { ParsedTransaction } from "../parsers/excel";
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
 interface AIExtracted {
-  date: string;       // YYYY-MM-DD
+  date: string;        // YYYY-MM-DD
   description: string;
-  amount: number;     // эерэг = орлого, сөрөг = зарлага
+  counterparty?: string; // харьцсан данс (нэр эсвэл дансны дугаар), optional
+  amount: number;      // эерэг = орлого, сөрөг = зарлага
 }
 
 export async function aiExtractTransactions(rawRows: unknown[][]): Promise<ParsedTransaction[]> {
@@ -26,6 +27,7 @@ export async function aiExtractTransactions(rawRows: unknown[][]): Promise<Parse
 - Огноо тогтсон форматтай: YYYY-MM-DD
 - amount: орлого → эерэг, зарлага → сөрөг
 - description: гүйлгээний утга/тайлбар
+- counterparty: харьцсан данс (харьцагчийн нэр эсвэл дансны дугаар). Багана байвал авна, байхгүй бол орхи.
 - Толгойн мөр, нийт дүн, үлдэгдлийн мөр зэргийг ОРХИ
 - Хэрэв credit/debit тусдаа баганаар бичигдсэн бол credit→эерэг, debit→сөрөг
 
@@ -33,7 +35,7 @@ Raw өгөгдөл (мөр бүр массив):
 ${JSON.stringify(sample)}
 
 Зөвхөн JSON массив буцаа, өөр текст бүү бичсэн. Жишээ:
-[{"date":"2024-01-15","description":"Цалин","amount":1500000},{"date":"2024-01-16","description":"Хоол","amount":-15000}]`;
+[{"date":"2024-01-15","description":"Цалин","counterparty":"Болд ХХК","amount":1500000},{"date":"2024-01-16","description":"Хоол","amount":-15000}]`;
 
   try {
     const response = await client.messages.create({
@@ -51,6 +53,7 @@ ${JSON.stringify(sample)}
       .map(e => ({
         date: new Date(e.date),
         description: String(e.description ?? "").trim() || "Гүйлгээ",
+        counterparty: String(e.counterparty ?? "").trim() || undefined,
         amount: Number(e.amount),
       }))
       .filter(t => !isNaN(t.date.getTime()) && !isNaN(t.amount) && t.amount !== 0);

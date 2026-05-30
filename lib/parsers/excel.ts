@@ -56,6 +56,7 @@ interface ColMap {
   creditCol: string | null;
   debitCol: string | null;
   balanceCol: string | null;
+  counterpartyCol: string | null;
 }
 
 const RE = {
@@ -65,17 +66,20 @@ const RE = {
   debit: /зарлага|debit|outgoing|withdrawal|дебит|гарсан/i,
   amount: /дүн|amount|мөнгө|sum|нийт/i,
   balance: /үлдэгдэл|balance|остаток/i,
+  // Харьцсан данс / counterparty — нэр эсвэл дансны дугаар.
+  counterparty: /харьцсан\s*данс|харьцагч|counterparty|beneficiary|payer|payee/i,
 };
 
 function detectByHeaders(headers: string[]): ColMap {
   const find = (re: RegExp) => headers.find(h => re.test(h)) ?? null;
   return {
-    dateCol:    find(RE.date),
-    descCol:    find(RE.desc),
-    creditCol:  find(RE.credit),
-    debitCol:   find(RE.debit),
-    amountCol:  find(RE.amount),
-    balanceCol: find(RE.balance),
+    dateCol:         find(RE.date),
+    descCol:         find(RE.desc),
+    creditCol:       find(RE.credit),
+    debitCol:        find(RE.debit),
+    amountCol:       find(RE.amount),
+    balanceCol:      find(RE.balance),
+    counterpartyCol: find(RE.counterparty),
   };
 }
 
@@ -108,7 +112,12 @@ function buildTransaction(
 
   if (amount === null || amount === 0) return null;
 
-  // Тайлбар: descCol эсвэл хамгийн урт текст (огноо/тоо биш)
+  // Харьцсан данс / counterparty
+  const counterparty = cols.counterpartyCol
+    ? String(row[cols.counterpartyCol] ?? "").trim() || undefined
+    : undefined;
+
+  // Тайлбар: descCol эсвэл хамгийн урт текст (огноо/тоо/харьцсан данс биш)
   let description = "";
   if (cols.descCol) {
     description = String(row[cols.descCol] ?? "").trim();
@@ -117,13 +126,15 @@ function buildTransaction(
     const texts: string[] = [];
     for (const [col, val] of Object.entries(row)) {
       if (col === cols.dateCol || col === cols.balanceCol || col === cols.creditCol
-        || col === cols.debitCol || col === cols.amountCol) continue;
+        || col === cols.debitCol || col === cols.amountCol || col === cols.counterpartyCol) continue;
       if (isText(val)) texts.push(String(val).trim());
     }
-    description = texts.sort((a, b) => b.length - a.length)[0] ?? "Гүйлгээ";
+    description = texts.sort((a, b) => b.length - a.length)[0] ?? "";
   }
+  // Тайлбар олдоогүй бол харьцсан дансыг тайлбар болгон ашиглана (bank template-уудтай нийцүүлэв)
+  if (!description) description = counterparty ?? "Гүйлгээ";
 
-  return { date, description: description || "Гүйлгээ", amount };
+  return { date, description, counterparty, amount };
 }
 
 // ── Header offset-ийн чанарыг үнэлэх ──────────────────────────────
