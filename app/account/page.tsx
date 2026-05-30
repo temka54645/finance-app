@@ -1,16 +1,14 @@
 import { redirect } from "next/navigation";
-import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { getUsageContext, isLimitBypassed } from "@/lib/usage";
+import { requireUserPage } from "@/lib/route-guards";
 import AccountClient from "@/components/AccountClient";
 
 export const dynamic = "force-dynamic";
 
 export default async function AccountPage() {
-  const session = await auth();
-  if (!session?.user?.id) redirect("/login");
-
-  const userId = session.user.id;
+  // Нэвтрээгүй → /login, admin → /sys/control.
+  const userId = await requireUserPage();
 
   const [user, ctx] = await Promise.all([
     prisma.user.findUnique({

@@ -1,7 +1,11 @@
 import type { ReactNode } from "react";
 import { BarChart2, ShieldCheck, Sparkles, TrendingUp } from "lucide-react";
+import { redirectIfAuthenticated } from "@/lib/route-guards";
 
-export default function AuthLayout({ children }: { children: ReactNode }) {
+export default async function AuthLayout({ children }: { children: ReactNode }) {
+  // Аль хэдийн нэвтэрсэн бол /login, /signup руу буцаж орохгүй — role-ийн нүүр рүү.
+  await redirectIfAuthenticated();
+
   return (
     <div className="relative min-h-screen overflow-hidden bg-slate-50 text-slate-900">
       {/* Decorative background — blur circles + dotted pattern */}

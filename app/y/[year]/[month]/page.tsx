@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, BarChart2, Check } from "lucide-react";
 import MonthDetailContent from "@/components/MonthDetailContent";
+import { requireUserPage } from "@/lib/route-guards";
 
 const MONTH_NAMES = [
   "1-р сар", "2-р сар", "3-р сар", "4-р сар", "5-р сар", "6-р сар",
@@ -20,6 +21,9 @@ export async function generateMetadata({ params }: PageProps) {
 }
 
 export default async function MonthDetailPage({ params }: PageProps) {
+  // Нэвтрээгүй → /login, admin → /sys/control.
+  await requireUserPage();
+
   const { year: yearStr, month: monthStr } = await params;
   const year = Number(yearStr);
   const month = Number(monthStr);

@@ -1,6 +1,4 @@
-import { redirect } from "next/navigation";
-import { auth } from "@/auth";
-import { prisma } from "@/lib/db";
+import { requireAdminPage } from "@/lib/route-guards";
 import AdminClient from "@/components/AdminClient";
 
 export const metadata = {
@@ -9,16 +7,8 @@ export const metadata = {
 };
 
 export default async function AdminPage() {
-  const session = await auth();
-  // Нэвтрээгүй бол админ-login хуудас руу шилжүүлнэ (engiin /login биш)
-  if (!session?.user?.id) redirect("/sys/login");
-
-  const user = await prisma.user.findUnique({
-    where: { id: session.user.id },
-    select: { role: true },
-  });
-  // Non-admin бол энгийн сайт руу буцаана
-  if (user?.role !== "admin") redirect("/");
+  // Нэвтрээгүй → /sys/login, admin биш → /.
+  await requireAdminPage();
 
   return <AdminClient />;
 }

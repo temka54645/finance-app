@@ -1,13 +1,13 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import Link from "next/link";
+import { signOut } from "next-auth/react";
 import {
   Shield, Users, Database, Activity, TrendingUp, TrendingDown,
-  Search, Filter, ChevronDown, Mail, Crown, ArrowLeft, RefreshCw,
+  Search, Filter, ChevronDown, Mail, Crown, RefreshCw,
   Building2, User as UserIcon, FileText, Receipt, DollarSign,
   MessageSquare, Bug, Lightbulb, HelpCircle, Clock, CheckCircle2,
-  Loader2, AlertCircle, Tags,
+  Loader2, AlertCircle, Tags, LogOut,
 } from "lucide-react";
 
 const fmt = (n: number) => n.toLocaleString("mn-MN", { maximumFractionDigits: 0 }) + "₮";
@@ -176,13 +176,6 @@ export default function AdminClient() {
       <header className="relative z-20 border-b border-slate-200 bg-white/80 backdrop-blur-xl sticky top-0">
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-6 py-4">
           <div className="flex items-center gap-3">
-            <Link
-              href="/"
-              className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors"
-              title="Үндсэн самбар руу буцах"
-            >
-              <ArrowLeft className="h-4 w-4" />
-            </Link>
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 shadow-lg shadow-indigo-500/30">
               <Shield className="h-5 w-5 text-white" />
             </div>
@@ -191,14 +184,24 @@ export default function AdminClient() {
               <p className="text-xs text-slate-500">Системийн удирдлага · нууцлал</p>
             </div>
           </div>
-          <button
-            onClick={fetchAll}
-            disabled={loading}
-            className="p-2 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors"
-            title="Шинэчлэх"
-          >
-            <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
-          </button>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={fetchAll}
+              disabled={loading}
+              className="p-2 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors"
+              title="Шинэчлэх"
+            >
+              <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+            </button>
+            <button
+              onClick={() => signOut({ callbackUrl: "/sys/login" })}
+              className="inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium text-slate-600 hover:bg-rose-50 hover:text-rose-600 transition-colors"
+              title="Админаас гарах"
+            >
+              <LogOut className="h-4 w-4" />
+              Гарах
+            </button>
+          </div>
         </div>
       </header>
 

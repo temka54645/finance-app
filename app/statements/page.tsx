@@ -1,12 +1,16 @@
 import Link from "next/link";
 import { ArrowLeft, FileText } from "lucide-react";
 import StatementsManager from "@/components/StatementsManager";
+import { requireUserPage } from "@/lib/route-guards";
 
 export const metadata = {
   title: "Хуулга удирдах | Санхүүгийн дүн шинжилгээ",
 };
 
-export default function StatementsPage() {
+export default async function StatementsPage() {
+  // Нэвтрээгүй → /login, admin → /sys/control.
+  await requireUserPage();
+
   return (
     <div className="min-h-screen bg-gray-50">
       <header className="bg-white border-b border-gray-200 px-6 py-4 sticky top-0 z-30">

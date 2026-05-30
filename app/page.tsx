@@ -1,15 +1,14 @@
 import { redirect } from "next/navigation";
-import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
+import { requireUserPage } from "@/lib/route-guards";
 import DashboardClient from "@/components/DashboardClient";
 
 export default async function Page() {
-  // Server-side: fresh DB read, JWT staleness асуудал гарахгүй
-  const session = await auth();
-  if (!session?.user?.id) redirect("/login");
+  // Нэвтрээгүй → /login, admin → /sys/control. Энгийн хэрэглэгч л цааш үргэлжилнэ.
+  const userId = await requireUserPage();
 
   const user = await prisma.user.findUnique({
-    where: { id: session.user.id },
+    where: { id: userId },
     select: { userType: true },
   });
 
