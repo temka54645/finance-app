@@ -43,14 +43,19 @@ export default function BreakdownClient({ initialType = "all" }: Props) {
       if (year !== "all") qs.set("year", String(year));
       if (year !== "all" && month !== "all") qs.set("month", String(month));
       const suffix = qs.toString() ? `?${qs.toString()}` : "";
-      const [reports, txs] = await Promise.all([
-        fetch(`/api/reports${suffix}`).then(r => r.json()),
-        fetch(`/api/transactions${suffix}`).then(r => r.json()),
-      ]);
+      // reports — хөнгөн нэгтгэл (жилийн жагсаалт, ангилаагүйн тоо) тул үргэлж татна.
+      const reports = await fetch(`/api/reports${suffix}`).then(r => r.json());
       // availableYears нь шүүлтээс үл хамаарч бүх жилийг буцаадаг
       setYears(reports.availableYears ?? []);
       setUncategorizedCount(reports.uncategorizedCount ?? 0);
-      setTransactions(txs.transactions ?? []);
+      // Гүйлгээний жагсаалтыг зөвхөн тодорхой жил сонгосон үед татаж render хийнэ.
+      // ("Бүгд" үед бүх жилийн гүйлгээг зэрэг render хийвэл хэт их ачаалал болно.)
+      if (year === "all") {
+        setTransactions([]);
+      } else {
+        const txs = await fetch(`/api/transactions${suffix}`).then(r => r.json());
+        setTransactions(txs.transactions ?? []);
+      }
     } finally {
       setLoading(false);
     }
@@ -145,9 +150,16 @@ export default function BreakdownClient({ initialType = "all" }: Props) {
         />
       )}
 
-      {/* Бүх гүйлгээ — шүүж, олноор сонгож ангилна */}
+      {/* Гүйлгээ — зөвхөн жил сонгосны дараа render хийнэ */}
       <section>
-        {loading ? (
+        {year === "all" ? (
+          <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-10 text-center">
+            <p className="text-sm font-medium text-slate-500">Гүйлгээг харахын тулд жил сонгоно уу</p>
+            <p className="mt-1 text-xs text-slate-400">
+              Дээрх «Жил» хэсгээс тодорхой жил (шаардлагатай бол сар) сонгоход гүйлгээ энд харагдана
+            </p>
+          </div>
+        ) : loading ? (
           <div className="flex items-center justify-center py-20 text-slate-400">
             <Loader2 className="h-6 w-6 animate-spin" />
           </div>
