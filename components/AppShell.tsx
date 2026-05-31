@@ -4,21 +4,47 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useSession } from "next-auth/react";
-import { BarChart2, LayoutDashboard, ListTree, RefreshCw, Upload, X } from "lucide-react";
+import { BarChart2, LayoutDashboard, ListTree, RefreshCw, Upload, X, Tags, User, Building2 } from "lucide-react";
 import FileUpload from "@/components/FileUpload";
 import UserMenu from "@/components/UserMenu";
 import FeedbackButton from "@/components/FeedbackButton";
 import { emitDataChanged } from "@/lib/use-data-refresh";
+import type { UserType } from "@/lib/categories";
 
 const NAV = [
   { href: "/", label: "Хяналтын самбар", icon: LayoutDashboard },
   { href: "/breakdown", label: "Задаргаа", icon: ListTree },
+  { href: "/categories", label: "Ангиллын каталог", icon: Tags },
 ];
+
+/** Хувь хүн / Байгууллага горимын харагдах байдлыг тодорхойлно. */
+const MODE = {
+  personal: {
+    label: "Хувь хүн",
+    sub: "Хувийн санхүү",
+    icon: User,
+    badge: "border-indigo-200 bg-indigo-50 text-indigo-700",
+    iconWrap: "bg-indigo-600 text-white",
+    pill: "border-indigo-200 bg-indigo-50 text-indigo-700",
+  },
+  business: {
+    label: "Байгууллага",
+    sub: "Байгууллагын санхүү",
+    icon: Building2,
+    badge: "border-amber-300 bg-amber-50 text-amber-800",
+    iconWrap: "bg-amber-500 text-white",
+    pill: "border-amber-300 bg-amber-50 text-amber-800",
+  },
+} as const;
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const { data: session } = useSession();
   const pathname = usePathname();
   const [uploadModalOpen, setUploadModalOpen] = useState(false);
+
+  const userType = ((session?.user as { userType?: UserType | null } | undefined)?.userType) ?? null;
+  const mode = userType ? MODE[userType] : null;
+  const ModeIcon = mode?.icon;
 
   useEffect(() => {
     if (!uploadModalOpen) return;
@@ -71,6 +97,20 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             <p className="truncate text-xs text-slate-500">Санхүүгийн зөвлөх</p>
           </div>
         </Link>
+        {/* Горимын ялгаа — хувь хүн эсвэл байгууллага гэдгийг тод харуулна */}
+        {mode && ModeIcon && (
+          <div className="px-3 pt-4">
+            <div className={`flex items-center gap-3 rounded-xl border px-3 py-2.5 ${mode.badge}`}>
+              <div className={`flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg ${mode.iconWrap}`}>
+                <ModeIcon className="h-5 w-5" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-[10px] font-medium uppercase tracking-wider opacity-70">Хэрэглэгчийн горим</p>
+                <p className="truncate text-sm font-semibold leading-tight">{mode.label}</p>
+              </div>
+            </div>
+          </div>
+        )}
         <nav className="flex flex-1 flex-col gap-1 px-3 py-4">{navLinks("side")}</nav>
         {/* Профайл — зүүн доод буланд */}
         {session?.user && (
@@ -90,6 +130,13 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
               <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600">
                 <BarChart2 className="h-4 w-4 text-white" />
               </div>
+              {/* Горимын ялгаа — гар утсан дээр товч pill */}
+              {mode && ModeIcon && (
+                <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-semibold ${mode.pill}`}>
+                  <ModeIcon className="h-3 w-3" />
+                  {mode.label}
+                </span>
+              )}
             </div>
             <div className="hidden items-center gap-1 md:flex" />
             <div className="flex items-center gap-1 overflow-x-auto md:hidden">{navLinks("top")}</div>

@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import { useSession } from "next-auth/react";
 import { AlertCircle, ChevronDown, ChevronUp, Check, Loader2 } from "lucide-react";
 import { getIncomeGroups, getExpenseGroups, type UserType } from "@/lib/categories";
+import { useCustomCategories } from "@/lib/use-custom-categories";
 
 interface Transaction {
   id: string;
@@ -35,6 +36,7 @@ export default function UncategorizedSection({ statementId, count, onUpdate, yea
 
   const incomeGroups = useMemo(() => getIncomeGroups(userType), [userType]);
   const expenseGroups = useMemo(() => getExpenseGroups(userType), [userType]);
+  const { income: customIncome, expense: customExpense } = useCustomCategories(userType);
 
   const [expanded, setExpanded] = useState(false);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -165,6 +167,13 @@ export default function UncategorizedSection({ statementId, count, onUpdate, yea
                         {g.items.map(i => <option key={i.id} value={i.name}>{i.name}</option>)}
                       </optgroup>
                     ))}
+                    {(customIncome.length > 0 || customExpense.length > 0) && (
+                      <optgroup label="🏷️ Миний ангилал">
+                        {[...customIncome, ...customExpense].map(c => (
+                          <option key={c.id} value={c.name}>{c.name}</option>
+                        ))}
+                      </optgroup>
+                    )}
                   </select>
                   <button
                     onClick={applyBulk}
@@ -218,6 +227,13 @@ export default function UncategorizedSection({ statementId, count, onUpdate, yea
                             {g.items.map(i => <option key={i.id} value={i.name}>{i.name}</option>)}
                           </optgroup>
                         ))}
+                        {(t.type === "income" ? customIncome : customExpense).length > 0 && (
+                          <optgroup label="Миний ангилал">
+                            {(t.type === "income" ? customIncome : customExpense).map(c => (
+                              <option key={c.id} value={c.name}>{c.name}</option>
+                            ))}
+                          </optgroup>
+                        )}
                       </select>
                     </div>
                   );

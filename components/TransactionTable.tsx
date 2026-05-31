@@ -8,6 +8,7 @@ import {
   CheckSquare, Square, Tag, Loader2,
 } from "lucide-react";
 import { getCategoryStyle } from "@/lib/category-icons";
+import { useCustomCategories } from "@/lib/use-custom-categories";
 import { getIncomeGroups, getExpenseGroups, type UserType } from "@/lib/categories";
 import { getBankMeta } from "@/lib/bankMeta";
 import BankBadge from "./BankBadge";
@@ -44,6 +45,7 @@ export default function TransactionTable({ transactions, onUpdate }: Props) {
   const userType: UserType = ((session?.user as { userType?: string | null } | undefined)?.userType === "business")
     ? "business"
     : "personal";
+  const { income: customIncome, expense: customExpense } = useCustomCategories(userType);
 
   // Editing state
   const [editId, setEditId] = useState<string | null>(null);
@@ -622,6 +624,17 @@ export default function TransactionTable({ transactions, onUpdate }: Props) {
                     ))}
                   </optgroup>
                 ))}
+                {(() => {
+                  const custom =
+                    selectedType === "income" ? customIncome :
+                    selectedType === "expense" ? customExpense :
+                    [...customIncome, ...customExpense];
+                  return custom.length > 0 ? (
+                    <optgroup label="Миний ангилал">
+                      {custom.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+                    </optgroup>
+                  ) : null;
+                })()}
               </select>
               <button
                 onClick={applyBulkCategory}
@@ -777,6 +790,13 @@ export default function TransactionTable({ transactions, onUpdate }: Props) {
                             ))}
                           </optgroup>
                         ))}
+                        {(editData.type === "income" ? customIncome : customExpense).length > 0 && (
+                          <optgroup label="Миний ангилал">
+                            {(editData.type === "income" ? customIncome : customExpense).map(c => (
+                              <option key={c.id} value={c.name}>{c.name}</option>
+                            ))}
+                          </optgroup>
+                        )}
                       </select>
                     ) : (() => {
                       const style = getCategoryStyle(t.category);
