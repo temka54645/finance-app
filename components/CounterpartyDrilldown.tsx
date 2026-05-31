@@ -1,14 +1,9 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import {
-  Loader2,
-  ChevronDown,
-  ChevronRight,
-  ArrowUpRight,
-  ArrowDownRight,
-} from "lucide-react";
-import { useDataRefresh } from "@/lib/use-data-refresh";
+import { useState, useEffect, useCallback, useRef } from "react";
+import { Loader2, ChevronDown, ChevronRight } from "lucide-react";
+import TransactionTable from "@/components/TransactionTable";
+import { emitDataChanged, useDataRefresh } from "@/lib/use-data-refresh";
 
 export type Metric = "income" | "expense" | "largest" | "frequent";
 
@@ -46,12 +41,6 @@ export const METRIC_META: Record<Metric, { label: string; type?: "income" | "exp
 
 function fmt(n: number) {
   return n.toLocaleString("mn-MN", { maximumFractionDigits: 0 }) + "₮";
-}
-
-function fmtDate(s: string) {
-  const d = new Date(s);
-  if (isNaN(d.getTime())) return "";
-  return d.toLocaleDateString("mn-MN", { year: "numeric", month: "2-digit", day: "2-digit" });
 }
 
 function toRows(metric: Metric, data: InsightsData): PartyRow[] {
@@ -98,6 +87,8 @@ export default function CounterpartyDrilldown({ metric, year, month }: Props) {
   const [open, setOpen] = useState<string | null>(null);
   const [txCache, setTxCache] = useState<Record<string, Transaction[]>>({});
   const [txLoading, setTxLoading] = useState<string | null>(null);
+  const openRef = useRef<string | null>(null);
+  useEffect(() => { openRef.current = open; }, [open]);
 
   const scopeQs = useCallback(() => {
     const qs = new URLSearchParams();
@@ -105,6 +96,12 @@ export default function CounterpartyDrilldown({ metric, year, month }: Props) {
     if (typeof month === "number") qs.set("month", String(month));
     return qs;
   }, [year, month]);
+
+  // Хүрээ (үзүүлэлт/жил/сар) солигдоход дэлгээстэй мөр болон кэшийг шинэчилнэ.
+  useEffect(() => {
+    setOpen(null);
+    setTxCache({});
+  }, [metric, year, month]);
 
   const fetchList = useCallback(async () => {
     setLoading(true);
@@ -114,15 +111,12 @@ export default function CounterpartyDrilldown({ metric, year, month }: Props) {
       const res = await fetch(`/api/insights/counterparties?${qs.toString()}`);
       const data: InsightsData = await res.json();
       setRows(toRows(metric, data));
-      setOpen(null);
-      setTxCache({});
     } finally {
       setLoading(false);
     }
   }, [metric, scopeQs]);
 
   useEffect(() => { fetchList(); }, [fetchList]);
-  useDataRefresh(fetchList);
 
   const loadTx = useCallback(async (counterparty: string) => {
     setTxLoading(counterparty);
@@ -142,6 +136,15 @@ export default function CounterpartyDrilldown({ metric, year, month }: Props) {
       setTxLoading(null);
     }
   }, [scopeQs, metricType, metric]);
+
+  // Дата шинэчлэгдвэл (категори өөрчлөгдөх г.м) жагсаалт + дэлгээстэй мөрийг
+  // дахин ачаална — задаргааг хаалгүйгээр.
+  const refresh = useCallback(async () => {
+    await fetchList();
+    const cur = openRef.current;
+    if (cur) loadTx(cur);
+  }, [fetchList, loadTx]);
+  useDataRefresh(refresh);
 
   const toggle = (counterparty: string) => {
     if (open === counterparty) {
@@ -197,42 +200,17 @@ export default function CounterpartyDrilldown({ metric, year, month }: Props) {
             </button>
 
             {isOpen && (
-              <div className="border-t border-slate-100 bg-slate-50/60 px-4 py-3">
+              <div className="border-t border-slate-100 bg-slate-50/60 px-3 py-3 sm:px-4">
                 {txLoading === r.counterparty && !txs ? (
                   <div className="flex items-center justify-center py-6 text-slate-400">
                     <Loader2 className="h-4 w-4 animate-spin" />
                   </div>
-                ) : txs && txs.length > 0 ? (
-                  <ul className="divide-y divide-slate-100">
-                    {txs.map(t => (
-                      <li key={t.id} className="flex items-center gap-3 py-2">
-                        <span className="flex-shrink-0">
-                          {t.type === "income" ? (
-                            <ArrowUpRight className="h-4 w-4 text-emerald-500" />
-                          ) : (
-                            <ArrowDownRight className="h-4 w-4 text-rose-500" />
-                          )}
-                        </span>
-                        <span className="min-w-0 flex-1">
-                          <span className="block truncate text-sm text-slate-700" title={t.description}>
-                            {t.description || "Гүйлгээ"}
-                          </span>
-                          <span className="block text-[10px] text-slate-400">
-                            {fmtDate(t.date)}
-                            {t.category ? ` · ${t.category}` : ""}
-                            {t.statement?.bankName ? ` · ${t.statement.bankName}` : ""}
-                          </span>
-                        </span>
-                        <span
-                          className={`flex-shrink-0 text-sm font-semibold tabular-nums ${
-                            t.type === "income" ? "text-emerald-600" : "text-rose-600"
-                          }`}
-                        >
-                          {fmt(t.amount)}
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
+                ) : txs ? (
+                  <TransactionTable
+                    transactions={txs}
+                    onUpdate={emitDataChanged}
+                    initialType={metricType ?? "all"}
+                  />
                 ) : (
                   <p className="py-4 text-center text-xs text-slate-400">Гүйлгээ олдсонгүй</p>
                 )}
