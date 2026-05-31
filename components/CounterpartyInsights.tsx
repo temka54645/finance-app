@@ -92,21 +92,33 @@ function RankRow({
   name,
   primary,
   secondary,
+  pct,
+  barClass,
 }: {
   rank: number;
   name: string;
   primary: string;
   secondary: string;
+  /** 0–100 — өгвөл мөрийн ард харьцангуй хэмжээний баганыг зурна (full горим). */
+  pct?: number;
+  barClass?: string;
 }) {
   return (
-    <li className="flex items-center gap-3 py-1.5">
-      <span className="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full bg-slate-100 text-[10px] font-semibold text-slate-500">
+    <li className="relative flex items-center gap-3 py-1.5">
+      {pct !== undefined && (
+        <span
+          aria-hidden
+          className={`pointer-events-none absolute inset-y-1 left-0 rounded-md ${barClass ?? "bg-slate-100"}`}
+          style={{ width: `${Math.max(pct, 2)}%` }}
+        />
+      )}
+      <span className="relative z-10 flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full bg-white text-[10px] font-semibold text-slate-500 ring-1 ring-slate-200">
         {rank}
       </span>
-      <span className="min-w-0 flex-1 truncate text-sm text-slate-700" title={name}>
+      <span className="relative z-10 min-w-0 flex-1 truncate text-sm text-slate-700" title={name}>
         {name}
       </span>
-      <span className="flex-shrink-0 text-right">
+      <span className="relative z-10 flex-shrink-0 text-right">
         <span className="block text-sm font-semibold tabular-nums text-slate-900">{primary}</span>
         <span className="block text-[10px] text-slate-400">{secondary}</span>
       </span>
@@ -124,25 +136,30 @@ interface Props {
   month?: number;
   /** Нягт горим — нэг цонхонд багтаахаар цөөн мөр харуулна (dashboard). */
   compact?: boolean;
+  /** Бүрэн горим — бүх жагсаалтыг (top 8 биш) харьцангуй баганатайгаар харуулна. */
+  full?: boolean;
 }
 
-export default function CounterpartyInsights({ year, month, compact = false }: Props = {}) {
+export default function CounterpartyInsights({ year, month, compact = false, full = false }: Props = {}) {
   const [data, setData] = useState<InsightsData | null>(null);
   const [loading, setLoading] = useState(true);
 
   const scoped = typeof year === "number";
   const limit = compact ? 4 : Infinity;
+  // Бүрэн горимд жагсаалт урт болох тул карт бүрд гүйлгэх (scroll) хязгаар тавина.
+  const listClass = `divide-y divide-slate-100${full ? " max-h-[26rem] overflow-y-auto pr-1" : ""}`;
 
   const fetchData = useCallback(async () => {
     const qs = new URLSearchParams();
     if (typeof year === "number") qs.set("year", String(year));
     if (typeof month === "number") qs.set("month", String(month));
+    if (full) qs.set("full", "1");
     const suffix = qs.toString() ? `?${qs.toString()}` : "";
     const res = await fetch(`/api/insights/counterparties${suffix}`);
     const json = await res.json();
     setData(json);
     setLoading(false);
-  }, [year, month]);
+  }, [year, month, full]);
 
   useEffect(() => {
     setLoading(true);
@@ -155,7 +172,7 @@ export default function CounterpartyInsights({ year, month, compact = false }: P
       <section>
         <div className="mb-4">
           <h3 className="text-sm font-semibold uppercase tracking-wider text-slate-700">
-            Харьцагчийн шинжилгээ
+            Гүйлгээний шинжилгээ
           </h3>
           <p className="mt-1 text-xs text-slate-500">
             {scoped ? "Энэ хугацааны дүнгээр" : "Бүх хугацааны дүнгээр"}
@@ -178,7 +195,7 @@ export default function CounterpartyInsights({ year, month, compact = false }: P
     <section>
       <div className="mb-4">
         <h3 className="text-sm font-semibold uppercase tracking-wider text-slate-700">
-          Харьцагчийн шинжилгээ
+          Гүйлгээний шинжилгээ
         </h3>
         <p className="mt-1 text-xs text-slate-500">
           {scoped
@@ -196,7 +213,7 @@ export default function CounterpartyInsights({ year, month, compact = false }: P
           accent="bg-emerald-100 text-emerald-700 border-emerald-200"
         >
           {data.topIncome.length ? (
-            <ul className="divide-y divide-slate-100">
+            <ul className={listClass}>
               {data.topIncome.slice(0, limit).map((r, i) => (
                 <RankRow
                   key={r.counterparty}
@@ -204,6 +221,8 @@ export default function CounterpartyInsights({ year, month, compact = false }: P
                   name={r.counterparty}
                   primary={fmt(r.total)}
                   secondary={`${r.count} гүйлгээ`}
+                  pct={full ? (r.total / data.topIncome[0].total) * 100 : undefined}
+                  barClass="bg-emerald-50"
                 />
               ))}
             </ul>
@@ -220,7 +239,7 @@ export default function CounterpartyInsights({ year, month, compact = false }: P
           accent="bg-rose-100 text-rose-700 border-rose-200"
         >
           {data.topExpense.length ? (
-            <ul className="divide-y divide-slate-100">
+            <ul className={listClass}>
               {data.topExpense.slice(0, limit).map((r, i) => (
                 <RankRow
                   key={r.counterparty}
@@ -228,6 +247,8 @@ export default function CounterpartyInsights({ year, month, compact = false }: P
                   name={r.counterparty}
                   primary={fmt(r.total)}
                   secondary={`${r.count} гүйлгээ`}
+                  pct={full ? (r.total / data.topExpense[0].total) * 100 : undefined}
+                  barClass="bg-rose-50"
                 />
               ))}
             </ul>
@@ -244,7 +265,7 @@ export default function CounterpartyInsights({ year, month, compact = false }: P
           accent="bg-amber-100 text-amber-700 border-amber-200"
         >
           {data.largest.length ? (
-            <ul className="divide-y divide-slate-100">
+            <ul className={listClass}>
               {data.largest.slice(0, limit).map((r, i) => (
                 <li key={i} className="flex items-center gap-3 py-1.5">
                   <span className="flex-shrink-0">
@@ -283,7 +304,7 @@ export default function CounterpartyInsights({ year, month, compact = false }: P
           accent="bg-blue-100 text-blue-700 border-blue-200"
         >
           {data.mostFrequent.length ? (
-            <ul className="divide-y divide-slate-100">
+            <ul className={listClass}>
               {data.mostFrequent.slice(0, limit).map((r, i) => (
                 <RankRow
                   key={r.counterparty}
@@ -291,6 +312,8 @@ export default function CounterpartyInsights({ year, month, compact = false }: P
                   name={r.counterparty}
                   primary={`${r.count} удаа`}
                   secondary={fmt(r.total)}
+                  pct={full ? (r.count / data.mostFrequent[0].count) * 100 : undefined}
+                  barClass="bg-blue-50"
                 />
               ))}
             </ul>

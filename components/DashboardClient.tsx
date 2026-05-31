@@ -21,12 +21,12 @@ interface OverviewReport {
 
 /** Үндсэн dashboard дээр үйлдэл хийгдэхгүй — энэ wrapper нь доtorх агуулгыг
  *  идэвхгүй болгож, дарахад "Задаргаа" цэс рүү шилжүүлнэ. */
-function ToBreakdown({ children }: { children: React.ReactNode }) {
+function ToBreakdown({ href = "/breakdown", children }: { href?: string; children: React.ReactNode }) {
   return (
     <Link
-      href="/breakdown"
+      href={href}
       className="group relative block rounded-2xl outline-none transition focus-visible:ring-2 focus-visible:ring-blue-400"
-      title="Задаргаа цэс рүү шилжих"
+      title="Задаргаа харах"
     >
       <span className="pointer-events-none absolute right-3 top-3 z-10 hidden items-center gap-1 rounded-full bg-blue-600 px-2.5 py-1 text-[11px] font-semibold text-white shadow-lg group-hover:flex">
         Задаргаа харах <ArrowRight className="h-3 w-3" />
@@ -108,8 +108,8 @@ export default function DashboardClient() {
           {/* Сарын динамик — интерактив (жил сонгох, бүгдийг нэгтгэх, ангиллын pie) */}
           <MonthlyBarChart />
 
-          {/* Харьцагчийн шинжилгээ — бүрэн дэлгэрэнгүй, дарахад задаргаа руу */}
-          <ToBreakdown>
+          {/* Гүйлгээний шинжилгээ — топ үзүүлэлт, дарахад бүрэн жагсаалт руу */}
+          <ToBreakdown href="/insights">
             <CounterpartyInsights />
           </ToBreakdown>
         </>

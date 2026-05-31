@@ -7,6 +7,8 @@ import { requireUserId, UnauthorizedError } from "@/lib/auth-helpers";
 // counterparty нь чөлөөт текст тул v1 дээр яг тэр стрингээр нь бүлэглэнэ
 // (банк хооронд нэг харьцагч өөр өөр форматтай байж болзошгүй — мэдэгдэхүйц).
 const TOP_N = 8;
+// Бүрэн жагсаалт (задаргааны хуудас) дээр харуулах дээд хязгаар.
+const FULL_N = 500;
 
 interface GroupRow {
   counterparty: string;
@@ -55,6 +57,8 @@ export async function GET(req: NextRequest) {
     const year = yearParam ? Number(yearParam) : null;
     const monthParam = searchParams.get("month");
     const month = monthParam ? Number(monthParam) : null;
+    // full=1 — task: задаргаа харах хуудсанд бүтэн жагсаалтыг буцаана.
+    const limit = searchParams.get("full") === "1" ? FULL_N : TOP_N;
 
     // Хугацааны хязгаар (сонгосон бол) — бүх query-д нэмэх SQL fragment.
     let range: { gte: Date; lt: Date } | null = null;
@@ -94,7 +98,7 @@ export async function GET(req: NextRequest) {
         WHERE s."userId" = ${userId}
           ${dateFilter}
         ORDER BY t."amount" DESC
-        LIMIT ${TOP_N}
+        LIMIT ${limit}
       `,
       // 4: тогтмол/давтагдсан төлбөр — ≥3 өөр сард гарсан харьцагч
       prisma.$queryRaw<RecurringRow[]>`
@@ -119,13 +123,13 @@ export async function GET(req: NextRequest) {
     const topIncome = grouped
       .filter(r => r.type === "income")
       .sort((a, b) => b.total - a.total)
-      .slice(0, TOP_N)
+      .slice(0, limit)
       .map(r => ({ counterparty: r.counterparty, total: r.total, count: r.count }));
 
     const topExpense = grouped
       .filter(r => r.type === "expense")
       .sort((a, b) => b.total - a.total)
-      .slice(0, TOP_N)
+      .slice(0, limit)
       .map(r => ({ counterparty: r.counterparty, total: r.total, count: r.count }));
 
     // 3: Хамгийн их давтамжтай харьцагч — орлого+зарлага нийлбэр тоогоор
@@ -139,7 +143,7 @@ export async function GET(req: NextRequest) {
     const mostFrequent = Array.from(freqMap.entries())
       .map(([counterparty, v]) => ({ counterparty, count: v.count, total: v.total }))
       .sort((a, b) => b.count - a.count)
-      .slice(0, TOP_N);
+      .slice(0, limit);
 
     // 4: Тогтмол төлбөр — дүн нь ойролцоо (хэлбэлзлийн коэффициент бага)
     const recurring = recurringRaw
@@ -157,7 +161,7 @@ export async function GET(req: NextRequest) {
       })
       .filter(r => r.cv <= 0.35) // дүн харьцангуй тогтмол
       .sort((a, b) => (b.months - a.months) || (b.count - a.count))
-      .slice(0, TOP_N)
+      .slice(0, limit)
       .map(({ cv: _cv, ...rest }) => rest);
 
     return NextResponse.json({
