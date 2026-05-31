@@ -8,7 +8,6 @@ import UncategorizedSection from "./UncategorizedSection";
 import CategoryPieChart from "./CategoryPieChart";
 import DailyBarChart from "./DailyBarChart";
 import BankBreakdownCards from "./BankBreakdownCards";
-import CounterpartyInsights from "./CounterpartyInsights";
 
 interface Report {
   totalIncome: number;
@@ -117,8 +116,6 @@ export default function MonthDetailContent({ year, month, onExternalChange }: Pr
           </div>
         </>
       )}
-
-      {transactions.length > 0 && <CounterpartyInsights year={year} month={month} />}
 
       <div>
         <h3 className="text-sm font-semibold text-gray-700 mb-3">Гүйлгээний дэлгэрэнгүй</h3>

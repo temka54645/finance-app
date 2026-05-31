@@ -1,6 +1,7 @@
 "use client";
 
-import { TrendingUp, TrendingDown, Wallet } from "lucide-react";
+import Link from "next/link";
+import { TrendingUp, TrendingDown, Wallet, ArrowRight } from "lucide-react";
 import type { ReactNode } from "react";
 
 interface Props {
@@ -9,6 +10,8 @@ interface Props {
   balance: number;
   incomeCount: number;
   expenseCount: number;
+  /** Карт бүр дээр "Задаргаа" холбоос харуулах эсэх (зөвхөн хяналтын самбар). */
+  breakdownLinks?: boolean;
 }
 
 function fmt(n: number) {
@@ -46,12 +49,15 @@ function StatCard({
   sub,
   icon,
   accent,
+  href,
 }: {
   label: string;
   value: string;
   sub: string;
   icon: ReactNode;
   accent: Accent;
+  /** Өгвөл картын доор задаргаа руу шилжих товч харагдана. */
+  href?: string;
 }) {
   const p = PALETTES[accent];
   return (
@@ -65,6 +71,15 @@ function StatCard({
       </div>
       <p className={`relative mt-3 text-2xl font-semibold tabular-nums ${p.value}`}>{value}</p>
       <p className="relative mt-2 text-xs text-slate-500">{sub}</p>
+      {href && (
+        <Link
+          href={href}
+          className="relative mt-3 inline-flex items-center gap-1 rounded-lg bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600 transition-colors hover:bg-slate-900 hover:text-white"
+        >
+          Задаргаа
+          <ArrowRight className="h-3 w-3" />
+        </Link>
+      )}
     </div>
   );
 }
@@ -75,6 +90,7 @@ export default function SummaryCards({
   balance,
   incomeCount,
   expenseCount,
+  breakdownLinks = false,
 }: Props) {
   return (
     <div className="grid gap-4 sm:grid-cols-3">
@@ -84,6 +100,7 @@ export default function SummaryCards({
         sub={`${incomeCount} гүйлгээ`}
         icon={<TrendingUp className="h-4 w-4" />}
         accent="emerald"
+        href={breakdownLinks ? "/breakdown?type=income" : undefined}
       />
       <StatCard
         label="Нийт зарлага"
@@ -91,6 +108,7 @@ export default function SummaryCards({
         sub={`${expenseCount} гүйлгээ`}
         icon={<TrendingDown className="h-4 w-4" />}
         accent="rose"
+        href={breakdownLinks ? "/breakdown?type=expense" : undefined}
       />
       <StatCard
         label="Үлдэгдэл"
@@ -98,6 +116,7 @@ export default function SummaryCards({
         sub={balance >= 0 ? "Ашигтай" : "Алдагдалтай"}
         icon={<Wallet className="h-4 w-4" />}
         accent={balance >= 0 ? "blue" : "orange"}
+        href={breakdownLinks ? "/breakdown" : undefined}
       />
     </div>
   );

@@ -3,7 +3,11 @@ import { prisma } from "@/lib/db";
 import { requireUserPage } from "@/lib/route-guards";
 import BreakdownClient from "@/components/BreakdownClient";
 
-export default async function Page() {
+interface PageProps {
+  searchParams: Promise<{ type?: string }>;
+}
+
+export default async function Page({ searchParams }: PageProps) {
   // Нэвтрээгүй → /login, admin → /sys/control. Энгийн хэрэглэгч л цааш үргэлжилнэ.
   const userId = await requireUserPage();
 
@@ -14,5 +18,8 @@ export default async function Page() {
 
   if (!user?.userType) redirect("/onboarding");
 
-  return <BreakdownClient />;
+  const { type } = await searchParams;
+  const initialType = type === "income" || type === "expense" ? type : "all";
+
+  return <BreakdownClient initialType={initialType} />;
 }

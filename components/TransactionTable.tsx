@@ -29,18 +29,20 @@ interface Transaction {
   statement?: { fileName: string; bankName?: string | null };
 }
 
+type TypeFilter = "all" | "income" | "expense";
+
 interface Props {
   transactions: Transaction[];
   onUpdate: () => void;
+  /** Эхний төрлийн шүүлт (жишээ нь хяналтын самбарын картаас орж ирэхэд). */
+  initialType?: TypeFilter;
 }
-
-type TypeFilter = "all" | "income" | "expense";
 
 function fmt(n: number) {
   return n.toLocaleString("mn-MN", { maximumFractionDigits: 0 }) + "₮";
 }
 
-export default function TransactionTable({ transactions, onUpdate }: Props) {
+export default function TransactionTable({ transactions, onUpdate, initialType = "all" }: Props) {
   const { data: session } = useSession();
   const userType: UserType = ((session?.user as { userType?: string | null } | undefined)?.userType === "business")
     ? "business"
@@ -53,7 +55,7 @@ export default function TransactionTable({ transactions, onUpdate }: Props) {
 
   // Filter state
   const [search, setSearch] = useState("");
-  const [typeFilter, setTypeFilter] = useState<TypeFilter>("all");
+  const [typeFilter, setTypeFilter] = useState<TypeFilter>(initialType);
   const [bankFilter, setBankFilter] = useState<string>("all");
   const [categorySet, setCategorySet] = useState<Set<string>>(new Set());
   const [dateFrom, setDateFrom] = useState("");

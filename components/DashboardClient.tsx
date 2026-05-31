@@ -7,7 +7,6 @@ import { ArrowRight, AlertCircle } from "lucide-react";
 import AppShell from "@/components/AppShell";
 import SummaryCards from "@/components/SummaryCards";
 import MonthlyBarChart from "@/components/MonthlyBarChart";
-import CounterpartyInsights from "@/components/CounterpartyInsights";
 import { useDataRefresh } from "@/lib/use-data-refresh";
 
 interface OverviewReport {
@@ -17,23 +16,6 @@ interface OverviewReport {
   incomeCount: number;
   expenseCount: number;
   uncategorizedCount: number;
-}
-
-/** Үндсэн dashboard дээр үйлдэл хийгдэхгүй — энэ wrapper нь доtorх агуулгыг
- *  идэвхгүй болгож, дарахад "Задаргаа" цэс рүү шилжүүлнэ. */
-function ToBreakdown({ href = "/breakdown", children }: { href?: string; children: React.ReactNode }) {
-  return (
-    <Link
-      href={href}
-      className="group relative block rounded-2xl outline-none transition focus-visible:ring-2 focus-visible:ring-blue-400"
-      title="Задаргаа харах"
-    >
-      <span className="pointer-events-none absolute right-3 top-3 z-10 hidden items-center gap-1 rounded-full bg-blue-600 px-2.5 py-1 text-[11px] font-semibold text-white shadow-lg group-hover:flex">
-        Задаргаа харах <ArrowRight className="h-3 w-3" />
-      </span>
-      <div className="pointer-events-none transition-opacity group-hover:opacity-95">{children}</div>
-    </Link>
-  );
 }
 
 export default function DashboardClient() {
@@ -64,7 +46,7 @@ export default function DashboardClient() {
           </span>
         </h2>
         <p className="mt-1 text-sm text-slate-500">
-          Үзүүлэлт дээр дарж дэлгэрэнгүй задаргааг харна уу
+          Карт бүрийн «Задаргаа» товчоор гүйлгээний дэлгэрэнгүйг харна уу
         </p>
       </div>
 
@@ -77,16 +59,15 @@ export default function DashboardClient() {
 
       {hasData && overview && (
         <>
-          {/* Тойм карт — дарахад задаргаа руу */}
-          <ToBreakdown>
-            <SummaryCards
-              totalIncome={overview.totalIncome}
-              totalExpense={overview.totalExpense}
-              balance={overview.balance}
-              incomeCount={overview.incomeCount}
-              expenseCount={overview.expenseCount}
-            />
-          </ToBreakdown>
+          {/* Тойм карт — карт бүр өөрийн задаргаа руу холбогдоно */}
+          <SummaryCards
+            totalIncome={overview.totalIncome}
+            totalExpense={overview.totalExpense}
+            balance={overview.balance}
+            incomeCount={overview.incomeCount}
+            expenseCount={overview.expenseCount}
+            breakdownLinks
+          />
 
           {/* Ангилаагүй гүйлгээний сэрэмжлүүлэг — задаргаанд ангилна */}
           {overview.uncategorizedCount > 0 && (
@@ -107,11 +88,6 @@ export default function DashboardClient() {
 
           {/* Сарын динамик — интерактив (жил сонгох, бүгдийг нэгтгэх, ангиллын pie) */}
           <MonthlyBarChart />
-
-          {/* Гүйлгээний шинжилгээ — топ үзүүлэлт, дарахад бүрэн жагсаалт руу */}
-          <ToBreakdown href="/insights">
-            <CounterpartyInsights />
-          </ToBreakdown>
         </>
       )}
     </AppShell>
