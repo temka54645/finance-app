@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useState, useEffect } from "react";
+import Link from "next/link";
 import {
   TrendingUp,
   TrendingDown,
@@ -8,6 +9,7 @@ import {
   Repeat,
   ArrowUpRight,
   ArrowDownRight,
+  ArrowRight,
 } from "lucide-react";
 import { useDataRefresh } from "@/lib/use-data-refresh";
 
@@ -54,12 +56,15 @@ function Card({
   subtitle,
   icon,
   accent,
+  href,
   children,
 }: {
   title: string;
   subtitle: string;
   icon: React.ReactNode;
   accent: string;
+  /** Өгвөл картын толгойд бүтэн жагсаалт руу шилжих «Задаргаа» товч гарна. */
+  href?: string;
   children: React.ReactNode;
 }) {
   return (
@@ -68,10 +73,19 @@ function Card({
         <span className={`flex h-8 w-8 items-center justify-center rounded-lg border ${accent}`}>
           {icon}
         </span>
-        <div>
+        <div className="min-w-0 flex-1">
           <h4 className="text-sm font-semibold text-slate-900">{title}</h4>
           <p className="text-xs text-slate-500">{subtitle}</p>
         </div>
+        {href && (
+          <Link
+            href={href}
+            className="flex flex-shrink-0 items-center gap-1 rounded-lg bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600 transition-colors hover:bg-slate-900 hover:text-white"
+          >
+            Задаргаа
+            <ArrowRight className="h-3 w-3" />
+          </Link>
+        )}
       </div>
       <div className="mt-3">{children}</div>
     </div>
@@ -162,6 +176,13 @@ export default function CounterpartyInsights({ year, month }: Props = {}) {
     return null; // харьцсан дансны мэдээлэл байхгүй бол хэсгийг нууна
   }
 
+  // Задаргааны хуудас руу шилжих холбоос — сонгосон жил/сарын хүрээг дамжуулна.
+  const scopeQs = new URLSearchParams();
+  if (typeof year === "number") scopeQs.set("year", String(year));
+  if (typeof month === "number") scopeQs.set("month", String(month));
+  const scopeSuffix = scopeQs.toString() ? `?${scopeQs.toString()}` : "";
+  const detailHref = (metric: string) => `/insights/${metric}${scopeSuffix}`;
+
   return (
     <section>
       <div className="mb-4">
@@ -182,6 +203,7 @@ export default function CounterpartyInsights({ year, month }: Props = {}) {
           subtitle="Танд хамгийн их төлсөн харьцагчид"
           icon={<TrendingUp className="h-4 w-4" />}
           accent="bg-emerald-100 text-emerald-700 border-emerald-200"
+          href={detailHref("income")}
         >
           {data.topIncome.length ? (
             <ul className="divide-y divide-slate-100">
@@ -206,6 +228,7 @@ export default function CounterpartyInsights({ year, month }: Props = {}) {
           subtitle="Хамгийн их зарцуулсан харьцагчид"
           icon={<TrendingDown className="h-4 w-4" />}
           accent="bg-rose-100 text-rose-700 border-rose-200"
+          href={detailHref("expense")}
         >
           {data.topExpense.length ? (
             <ul className="divide-y divide-slate-100">
@@ -230,6 +253,7 @@ export default function CounterpartyInsights({ year, month }: Props = {}) {
           subtitle="Нэг удаагийн томоохон гүйлгээнүүд"
           icon={<Trophy className="h-4 w-4" />}
           accent="bg-amber-100 text-amber-700 border-amber-200"
+          href={detailHref("largest")}
         >
           {data.largest.length ? (
             <ul className="divide-y divide-slate-100">
@@ -269,6 +293,7 @@ export default function CounterpartyInsights({ year, month }: Props = {}) {
           subtitle="Гүйлгээний тоогоор"
           icon={<Repeat className="h-4 w-4" />}
           accent="bg-blue-100 text-blue-700 border-blue-200"
+          href={detailHref("frequent")}
         >
           {data.mostFrequent.length ? (
             <ul className="divide-y divide-slate-100">

@@ -3,16 +3,19 @@ import { prisma } from "@/lib/db";
 import { Prisma } from "@/app/generated/prisma/client";
 import { requireUserId, UnauthorizedError } from "@/lib/auth-helpers";
 
-// Харьцагч (counterparty) дээр суурилсан 4 үзүүлэлт.
+// Харьцагч (counterparty) дээр суурилсан үзүүлэлтүүд.
 // counterparty нь чөлөөт текст тул яг тэр стрингээр нь бүлэглэнэ
 // (банк хооронд нэг харьцагч өөр өөр форматтай байж болзошгүй — мэдэгдэхүйц).
 const TOP_N = 8;
+// full=1 (задаргааны хуудас) — бүх харьцагчийг буцаах дээд хязгаар.
+const FULL_N = 300;
 
 interface GroupRow {
   counterparty: string;
   type: string;
   total: number;
   count: number;
+  max: number;
 }
 
 interface LargestRow {
@@ -46,6 +49,8 @@ export async function GET(req: NextRequest) {
     const year = yearParam ? Number(yearParam) : null;
     const monthParam = searchParams.get("month");
     const month = monthParam ? Number(monthParam) : null;
+    // full=1 — задаргааны хуудсанд top 8 биш бүх харьцагчийг буцаана.
+    const limit = searchParams.get("full") === "1" ? FULL_N : TOP_N;
 
     // Хугацааны хязгаар (сонгосон бол) — бүх query-д нэмэх SQL fragment.
     let range: { gte: Date; lt: Date } | null = null;
@@ -59,12 +64,13 @@ export async function GET(req: NextRequest) {
       : Prisma.empty;
 
     const [grouped, largest] = await Promise.all([
-      // 1+3: харьцагч × төрөл бүрийн нийт дүн ба тоо
+      // Харьцагч × төрөл бүрийн нийт дүн, тоо, нэг удаагийн дээд дүн
       prisma.$queryRaw<GroupRow[]>`
         SELECT t."counterparty" AS counterparty,
                t."type" AS type,
                SUM(t."amount")::float AS total,
-               COUNT(*)::int AS count
+               COUNT(*)::int AS count,
+               MAX(t."amount")::float AS max
         FROM "Transaction" t
         JOIN "Statement" s ON s."id" = t."statementId"
         WHERE s."userId" = ${userId}
@@ -73,7 +79,7 @@ export async function GET(req: NextRequest) {
           ${dateFilter}
         GROUP BY t."counterparty", t."type"
       `,
-      // 2: хамгийн өндөр дүнтэй ганц гүйлгээнүүд
+      // Хамгийн өндөр дүнтэй ганц гүйлгээнүүд (картын жагсаалт — харьцагчгүй ч багтана)
       prisma.$queryRaw<LargestRow[]>`
         SELECT t."counterparty" AS counterparty,
                t."description" AS description,
@@ -85,7 +91,7 @@ export async function GET(req: NextRequest) {
         WHERE s."userId" = ${userId}
           ${dateFilter}
         ORDER BY t."amount" DESC
-        LIMIT ${TOP_N}
+        LIMIT ${limit}
       `,
     ]);
 
@@ -93,27 +99,39 @@ export async function GET(req: NextRequest) {
     const topIncome = grouped
       .filter(r => r.type === "income")
       .sort((a, b) => b.total - a.total)
-      .slice(0, TOP_N)
+      .slice(0, limit)
       .map(r => ({ counterparty: r.counterparty, total: r.total, count: r.count }));
 
     const topExpense = grouped
       .filter(r => r.type === "expense")
       .sort((a, b) => b.total - a.total)
-      .slice(0, TOP_N)
+      .slice(0, limit)
       .map(r => ({ counterparty: r.counterparty, total: r.total, count: r.count }));
 
     // 3: Хамгийн их давтамжтай харьцагч — орлого+зарлага нийлбэр тоогоор
     const freqMap = new Map<string, { count: number; total: number }>();
+    // 4: Харьцагч тус бүрийн нэг удаагийн хамгийн өндөр гүйлгээ
+    const maxMap = new Map<string, { max: number; count: number }>();
     for (const r of grouped) {
       const e = freqMap.get(r.counterparty) ?? { count: 0, total: 0 };
       e.count += r.count;
       e.total += r.total;
       freqMap.set(r.counterparty, e);
+
+      const m = maxMap.get(r.counterparty) ?? { max: 0, count: 0 };
+      m.max = Math.max(m.max, r.max);
+      m.count += r.count;
+      maxMap.set(r.counterparty, m);
     }
     const mostFrequent = Array.from(freqMap.entries())
       .map(([counterparty, v]) => ({ counterparty, count: v.count, total: v.total }))
       .sort((a, b) => b.count - a.count)
-      .slice(0, TOP_N);
+      .slice(0, limit);
+
+    const largestParties = Array.from(maxMap.entries())
+      .map(([counterparty, v]) => ({ counterparty, max: v.max, count: v.count }))
+      .sort((a, b) => b.max - a.max)
+      .slice(0, limit);
 
     return NextResponse.json({
       topIncome,
@@ -126,6 +144,7 @@ export async function GET(req: NextRequest) {
         type: r.type,
       })),
       mostFrequent,
+      largestParties,
       hasCounterparty: grouped.length > 0,
     });
   } catch (err) {
