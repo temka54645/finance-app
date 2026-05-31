@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo } from "react";
 import { Search, TrendingUp, TrendingDown, User, Building2, Tags, Tag, Plus, X, Loader2 } from "lucide-react";
 import { useSession } from "next-auth/react";
 import AppShell from "@/components/AppShell";
@@ -19,14 +19,10 @@ export default function CategoriesPage() {
   const [tab, setTab] = useState<"income" | "expense">("expense");
   const [search, setSearch] = useState("");
 
+  // Хэрэглэгчийн төрлөөр цоожилно — хувь хүн зөвхөн хувь хүний, байгууллага
+  // зөвхөн байгууллагын ангиллыг харна. Энд солих боломжгүй.
   const sessionUserType = (session?.user as { userType?: string | null } | undefined)?.userType;
-  const [userType, setUserType] = useState<UserType>("personal");
-
-  useEffect(() => {
-    if (sessionUserType === "business" || sessionUserType === "personal") {
-      setUserType(sessionUserType);
-    }
-  }, [sessionUserType]);
+  const userType: UserType = sessionUserType === "business" ? "business" : "personal";
 
   const groups: CategoryGroup[] = useMemo(
     () => (tab === "income" ? getIncomeGroups(userType) : getExpenseGroups(userType)),
@@ -118,31 +114,17 @@ export default function CategoriesPage() {
         </div>
       </div>
 
-      {/* UserType switch + tabs + search */}
+      {/* Горимын тэмдэг (зөвхөн харах) + хайлт */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="inline-flex rounded-xl border border-slate-200 bg-white p-1 shadow-sm">
-          <button
-            onClick={() => setUserType("personal")}
-            className={`inline-flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
-              userType === "personal"
-                ? "bg-gradient-to-r from-blue-500 to-indigo-600 text-white shadow"
-                : "text-slate-600 hover:bg-slate-50"
-            }`}
-          >
-            <User className="h-3.5 w-3.5" />
-            Хувь хүн
-          </button>
-          <button
-            onClick={() => setUserType("business")}
-            className={`inline-flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
-              userType === "business"
-                ? "bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow"
-                : "text-slate-600 hover:bg-slate-50"
-            }`}
-          >
-            <Building2 className="h-3.5 w-3.5" />
-            Байгууллага
-          </button>
+        <div
+          className={`inline-flex items-center gap-2 rounded-xl border px-3 py-1.5 text-sm font-semibold ${
+            userType === "business"
+              ? "border-amber-300 bg-amber-50 text-amber-800"
+              : "border-indigo-200 bg-indigo-50 text-indigo-700"
+          }`}
+        >
+          {userType === "business" ? <Building2 className="h-4 w-4" /> : <User className="h-4 w-4" />}
+          {userType === "business" ? "Байгууллагын ангилал" : "Хувь хүний ангилал"}
         </div>
 
         <div className="relative max-w-md flex-1">
