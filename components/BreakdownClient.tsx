@@ -5,6 +5,7 @@ import { Loader2 } from "lucide-react";
 import AppShell from "@/components/AppShell";
 import UncategorizedSection from "@/components/UncategorizedSection";
 import TransactionTable from "@/components/TransactionTable";
+import CounterpartyDrilldown, { METRIC_META, type Metric } from "@/components/CounterpartyDrilldown";
 import { emitDataChanged, useDataRefresh } from "@/lib/use-data-refresh";
 
 interface Transaction {
@@ -24,14 +25,19 @@ const MONTHS = [
   "7-р сар", "8-р сар", "9-р сар", "10-р сар", "11-р сар", "12-р сар",
 ];
 
+const METRIC_ORDER: Metric[] = ["income", "expense", "largest", "frequent"];
+
 interface Props {
   initialType?: "all" | "income" | "expense";
+  initialMetric?: Metric | null;
 }
 
-export default function BreakdownClient({ initialType = "all" }: Props) {
+export default function BreakdownClient({ initialType = "all", initialMetric = null }: Props) {
   const [years, setYears] = useState<number[]>([]);
   const [year, setYear] = useState<number | "all">("all");
   const [month, setMonth] = useState<number | "all">("all");
+  // null = энгийн гүйлгээний жагсаалт; metric = тухайн үзүүлэлтийн харьцагчийн задаргаа.
+  const [metric, setMetric] = useState<Metric | null>(initialMetric);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [uncategorizedCount, setUncategorizedCount] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -48,9 +54,9 @@ export default function BreakdownClient({ initialType = "all" }: Props) {
       // availableYears нь шүүлтээс үл хамаарч бүх жилийг буцаадаг
       setYears(reports.availableYears ?? []);
       setUncategorizedCount(reports.uncategorizedCount ?? 0);
-      // Гүйлгээний жагсаалтыг зөвхөн тодорхой жил сонгосон үед татаж render хийнэ.
-      // ("Бүгд" үед бүх жилийн гүйлгээг зэрэг render хийвэл хэт их ачаалал болно.)
-      if (year === "all") {
+      // Гүйлгээний бүтэн жагсаалтыг зөвхөн "Гүйлгээ" горимд, тодорхой жил сонгосон үед татна.
+      // (Үзүүлэлтийн задаргаа горим өөрийн хөнгөн нэгтгэл + lazy татацтай тул энд татах шаардлагагүй.)
+      if (metric !== null || year === "all") {
         setTransactions([]);
       } else {
         const txs = await fetch(`/api/transactions${suffix}`).then(r => r.json());
@@ -59,7 +65,7 @@ export default function BreakdownClient({ initialType = "all" }: Props) {
     } finally {
       setLoading(false);
     }
-  }, [year, month]);
+  }, [year, month, metric]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
   useDataRefresh(fetchData);
@@ -80,11 +86,37 @@ export default function BreakdownClient({ initialType = "all" }: Props) {
           Гүйлгээний задаргаа
         </h2>
         <p className="mt-1 text-sm text-slate-500">
-          Жил, сараар шүүж бүх гүйлгээг харах, олноор сонгож ангилахад зориулсан
+          Жил, сараар шүүж бүх гүйлгээг харах, эсвэл үзүүлэлт бүрээр харьцагчийн задаргааг харах
         </p>
       </div>
 
-      {/* Жил / сарын шүүлт */}
+      {/* Үзүүлэлтийн шүүлт — энгийн жагсаалт эсвэл харьцагчийн задаргаа */}
+      <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Үзүүлэлт:</span>
+          <button
+            onClick={() => setMetric(null)}
+            className={`rounded-lg px-2.5 py-1 text-xs font-medium transition-colors ${
+              metric === null ? "bg-slate-900 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+            }`}
+          >
+            Гүйлгээ
+          </button>
+          {METRIC_ORDER.map(m => (
+            <button
+              key={m}
+              onClick={() => setMetric(m)}
+              className={`rounded-lg px-2.5 py-1 text-xs font-medium transition-colors ${
+                metric === m ? "bg-slate-900 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+              }`}
+            >
+              {METRIC_META[m].label}
+            </button>
+          ))}
+        </div>
+      </section>
+
+      {/* Жил / сарын шүүлт — хоёр горимд хамаарна */}
       <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Жил:</span>
@@ -150,9 +182,12 @@ export default function BreakdownClient({ initialType = "all" }: Props) {
         />
       )}
 
-      {/* Гүйлгээ — зөвхөн жил сонгосны дараа render хийнэ */}
+      {/* Үндсэн агуулга */}
       <section>
-        {year === "all" ? (
+        {metric !== null ? (
+          // Харьцагчийн задаргаа — харьцагч дээр дарж гүйлгээг lazy үзнэ
+          <CounterpartyDrilldown metric={metric} year={scopedYear} month={scopedMonth} />
+        ) : year === "all" ? (
           <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-10 text-center">
             <p className="text-sm font-medium text-slate-500">Гүйлгээг харахын тулд жил сонгоно уу</p>
             <p className="mt-1 text-xs text-slate-400">

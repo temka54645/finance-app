@@ -180,8 +180,10 @@ export default function CounterpartyInsights({ year, month }: Props = {}) {
   const scopeQs = new URLSearchParams();
   if (typeof year === "number") scopeQs.set("year", String(year));
   if (typeof month === "number") scopeQs.set("month", String(month));
-  const scopeSuffix = scopeQs.toString() ? `?${scopeQs.toString()}` : "";
-  const detailHref = (metric: string) => `/insights/${metric}${scopeSuffix}`;
+  const detailHref = (metric: string) => {
+    scopeQs.set("metric", metric);
+    return `/breakdown?${scopeQs.toString()}`;
+  };
 
   return (
     <section>
