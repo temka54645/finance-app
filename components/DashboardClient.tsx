@@ -7,6 +7,7 @@ import { ArrowRight, AlertCircle } from "lucide-react";
 import AppShell from "@/components/AppShell";
 import SummaryCards from "@/components/SummaryCards";
 import MonthlyBarChart from "@/components/MonthlyBarChart";
+import CounterpartyInsights from "@/components/CounterpartyInsights";
 import { useDataRefresh } from "@/lib/use-data-refresh";
 
 interface OverviewReport {
@@ -88,6 +89,9 @@ export default function DashboardClient() {
 
           {/* Сарын динамик — интерактив (жил сонгох, бүгдийг нэгтгэх, ангиллын pie) */}
           <MonthlyBarChart />
+
+          {/* Харьцагчийн 4 үзүүлэлт — бүх хугацаагаар */}
+          <CounterpartyInsights />
         </>
       )}
     </AppShell>
