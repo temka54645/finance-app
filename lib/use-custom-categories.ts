@@ -8,6 +8,8 @@ export interface CustomCategory {
   name: string;
   type: "income" | "expense";
   userType: UserType;
+  /** lib/custom-category-icons.ts доторх icon key. null бол default "tag". */
+  icon?: string | null;
 }
 
 /**

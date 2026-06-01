@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { Search, TrendingUp, TrendingDown, User, Building2, Tags, Tag, Plus, X, Loader2 } from "lucide-react";
+import { Search, TrendingUp, TrendingDown, User, Building2, Tags, Tag, Plus, X, Loader2, Sparkles } from "lucide-react";
 import { useSession } from "next-auth/react";
 import AppShell from "@/components/AppShell";
 import {
@@ -13,6 +13,11 @@ import {
   type CategoryGroup,
 } from "@/lib/categories";
 import { useCustomCategories } from "@/lib/use-custom-categories";
+import {
+  CATEGORY_ICON_OPTIONS,
+  DEFAULT_ICON_KEY,
+  CategoryIcon,
+} from "@/lib/custom-category-icons";
 
 export default function CategoriesPage() {
   const { data: session } = useSession();
@@ -54,6 +59,54 @@ export default function CategoriesPage() {
   const [newName, setNewName] = useState("");
   const [adding, setAdding] = useState(false);
   const [error, setError] = useState("");
+  // Сонгосон лого + хэрэглэгч өөрөө гар аргаар сонгосон эсэх + сонгогчийн нээлттэй байдал
+  const [selectedIcon, setSelectedIcon] = useState<string>(DEFAULT_ICON_KEY);
+  const [iconManual, setIconManual] = useState(false);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [suggesting, setSuggesting] = useState(false);
+
+  const resetIcon = () => {
+    setSelectedIcon(DEFAULT_ICON_KEY);
+    setIconManual(false);
+    setPickerOpen(false);
+  };
+
+  // AI-аар нэрэнд тохирох лого тооцоолно. Амжилттай бол key-г буцаана.
+  const suggestIcon = async (name: string): Promise<string | null> => {
+    try {
+      const res = await fetch("/api/categories/suggest-icon", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, type: tab }),
+      });
+      if (!res.ok) return null;
+      const data = await res.json();
+      return typeof data.icon === "string" ? data.icon : null;
+    } catch {
+      return null;
+    }
+  };
+
+  const handleSuggest = async () => {
+    const name = newName.trim();
+    if (!name || suggesting) return;
+    setSuggesting(true);
+    try {
+      const icon = await suggestIcon(name);
+      if (icon) {
+        setSelectedIcon(icon);
+        setIconManual(true); // AI-н санал болгосныг хүндэтгэж, нэмэх үед дахин дуудахгүй
+      }
+    } finally {
+      setSuggesting(false);
+    }
+  };
+
+  const pickIcon = (key: string) => {
+    setSelectedIcon(key);
+    setIconManual(true);
+    setPickerOpen(false);
+  };
 
   const staticNames = useMemo(
     () =>
@@ -75,10 +128,16 @@ export default function CategoriesPage() {
     }
     setAdding(true);
     try {
+      // Хэрэглэгч лого сонгоогүй бол нэрэнд нь тохирох логог AI-аар тооцоолно.
+      let icon = selectedIcon;
+      if (!iconManual && selectedIcon === DEFAULT_ICON_KEY) {
+        const ai = await suggestIcon(name);
+        if (ai) icon = ai;
+      }
       const res = await fetch("/api/categories", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, type: tab, userType }),
+        body: JSON.stringify({ name, type: tab, userType, icon }),
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
@@ -86,6 +145,7 @@ export default function CategoriesPage() {
         return;
       }
       setNewName("");
+      resetIcon();
       await reload();
     } finally {
       setAdding(false);
@@ -142,7 +202,7 @@ export default function CategoriesPage() {
       {/* Income / Expense tabs */}
       <div className="inline-flex rounded-xl border border-slate-200 bg-white p-1 shadow-sm">
         <button
-          onClick={() => { setTab("income"); setError(""); }}
+          onClick={() => { setTab("income"); setError(""); resetIcon(); }}
           className={`inline-flex items-center gap-2 rounded-lg px-4 py-1.5 text-sm font-medium transition-colors ${
             tab === "income" ? "bg-emerald-100 text-emerald-700" : "text-slate-600 hover:bg-slate-50"
           }`}
@@ -151,7 +211,7 @@ export default function CategoriesPage() {
           Орлого
         </button>
         <button
-          onClick={() => { setTab("expense"); setError(""); }}
+          onClick={() => { setTab("expense"); setError(""); resetIcon(); }}
           className={`inline-flex items-center gap-2 rounded-lg px-4 py-1.5 text-sm font-medium transition-colors ${
             tab === "expense" ? "bg-rose-100 text-rose-700" : "text-slate-600 hover:bg-slate-50"
           }`}
@@ -175,8 +235,53 @@ export default function CategoriesPage() {
           </div>
         </div>
 
-        {/* Нэмэх форм */}
-        <div className="flex flex-col gap-2 sm:flex-row">
+        {/* Нэмэх форм — лого сонгогч + нэр + AI санал + нэмэх */}
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-start">
+          {/* Лого сонгогч */}
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setPickerOpen(o => !o)}
+              title="Лого сонгох"
+              className={`flex h-[42px] w-[42px] flex-shrink-0 items-center justify-center rounded-xl border bg-white text-slate-600 transition-colors hover:border-blue-400 hover:text-blue-600 ${
+                pickerOpen ? "border-blue-500 ring-4 ring-blue-500/15" : "border-slate-200"
+              }`}
+            >
+              <CategoryIcon iconKey={selectedIcon} className="h-5 w-5" />
+            </button>
+
+            {pickerOpen && (
+              <>
+                {/* Гадна талд дарвал хаах backdrop */}
+                <div className="fixed inset-0 z-10" onClick={() => setPickerOpen(false)} />
+                <div className="absolute left-0 top-[48px] z-20 w-[280px] rounded-2xl border border-slate-200 bg-white p-3 shadow-xl">
+                  <p className="mb-2 px-1 text-xs font-semibold text-slate-500">Лого сонгох</p>
+                  <div className="grid max-h-56 grid-cols-6 gap-1.5 overflow-y-auto">
+                    {CATEGORY_ICON_OPTIONS.map(opt => {
+                      const Icon = opt.Icon;
+                      const active = opt.key === selectedIcon;
+                      return (
+                        <button
+                          key={opt.key}
+                          type="button"
+                          onClick={() => pickIcon(opt.key)}
+                          title={opt.label}
+                          className={`flex h-9 w-9 items-center justify-center rounded-lg transition-colors ${
+                            active
+                              ? "bg-blue-600 text-white"
+                              : "text-slate-500 hover:bg-slate-100 hover:text-slate-700"
+                          }`}
+                        >
+                          <Icon className="h-4 w-4" />
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+
           <input
             type="text"
             value={newName}
@@ -184,17 +289,33 @@ export default function CategoriesPage() {
             onKeyDown={e => { if (e.key === "Enter") addCategory(); }}
             maxLength={40}
             placeholder={`Шинэ ${tab === "income" ? "орлогын" : "зарлагын"} ангиллын нэр...`}
-            className="flex-1 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm placeholder:text-slate-400 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/15 focus:outline-none"
+            className="h-[42px] flex-1 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm placeholder:text-slate-400 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/15 focus:outline-none"
           />
+
+          {/* AI-аар лого санал болгох */}
+          <button
+            type="button"
+            onClick={handleSuggest}
+            disabled={suggesting || !newName.trim()}
+            title="Нэрэнд тохирох логог AI-аар санал болгох"
+            className="inline-flex h-[42px] items-center justify-center gap-1.5 rounded-xl border border-violet-200 bg-violet-50 px-3 py-2 text-sm font-medium text-violet-700 transition-colors hover:bg-violet-100 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {suggesting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+            AI лого
+          </button>
+
           <button
             onClick={addCategory}
             disabled={adding || !newName.trim()}
-            className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-blue-500 to-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-blue-500/30 transition-all hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
+            className="inline-flex h-[42px] items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-blue-500 to-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-blue-500/30 transition-all hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {adding ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
             Нэмэх
           </button>
         </div>
+        <p className="mt-2 text-xs text-slate-400">
+          Лого сонгох эсвэл «AI лого» дарж нэрэнд тохирох логог автоматаар сонгуул. Сонгоогүй бол нэмэх үед AI өөрөө тааруулна.
+        </p>
         {error && <p className="mt-2 text-xs font-medium text-rose-600">{error}</p>}
 
         {/* Жагсаалт */}
@@ -206,7 +327,7 @@ export default function CategoriesPage() {
                 className="group flex items-center gap-3 rounded-xl border border-slate-200 bg-white p-3 shadow-sm"
               >
                 <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-600">
-                  <Tag className="h-4 w-4" />
+                  <CategoryIcon iconKey={cat.icon} className="h-4 w-4" />
                 </div>
                 <span className="flex-1 truncate text-sm font-medium text-slate-700" title={cat.name}>
                   {cat.name}

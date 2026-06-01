@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { requireUserId, UnauthorizedError } from "@/lib/auth-helpers";
+import { isValidIconKey } from "@/lib/custom-category-icons";
 
 const TYPES = ["income", "expense"];
 const USER_TYPES = ["personal", "business"];
@@ -12,7 +13,7 @@ export async function GET() {
     const categories = await prisma.customCategory.findMany({
       where: { userId },
       orderBy: { createdAt: "asc" },
-      select: { id: true, name: true, type: true, userType: true },
+      select: { id: true, name: true, type: true, userType: true, icon: true },
     });
     return NextResponse.json({ categories });
   } catch (err) {
@@ -52,6 +53,8 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const name = typeof body.name === "string" ? body.name.trim() : "";
     const { type, userType } = body;
+    // icon заавал биш — танигдахгүй key ирвэл хадгалахгүй (default "tag" болно).
+    const icon = isValidIconKey(body.icon) ? body.icon : null;
 
     if (!name) {
       return NextResponse.json({ error: "Ангиллын нэр шаардлагатай" }, { status: 400 });
@@ -68,8 +71,8 @@ export async function POST(req: NextRequest) {
 
     try {
       const created = await prisma.customCategory.create({
-        data: { userId, name, type, userType },
-        select: { id: true, name: true, type: true, userType: true },
+        data: { userId, name, type, userType, icon },
+        select: { id: true, name: true, type: true, userType: true, icon: true },
       });
       return NextResponse.json({ category: created }, { status: 201 });
     } catch (e) {

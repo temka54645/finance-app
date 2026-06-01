@@ -46,6 +46,8 @@ model CustomCategory {
   type      String
   /// "personal" | "business" — аль горимын каталогт харагдах
   userType  String
+  /// lib/category-icons.ts доторх icon key (жишээ: "shopping-cart"). null бол default "tag".
+  icon      String?
   createdAt DateTime @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
