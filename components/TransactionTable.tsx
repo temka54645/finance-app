@@ -37,13 +37,15 @@ interface Props {
   onUpdate: () => void;
   /** Эхний төрлийн шүүлт (жишээ нь хяналтын самбарын картаас орж ирэхэд). */
   initialType?: TypeFilter;
+  /** Дэвшилтэт шүүлтийн самбарыг анхдагчаар нээлттэй харуулах (задаргааны хуудас). */
+  defaultAdvancedOpen?: boolean;
 }
 
 function fmt(n: number) {
   return n.toLocaleString("mn-MN", { maximumFractionDigits: 0 }) + "₮";
 }
 
-export default function TransactionTable({ transactions, onUpdate, initialType = "all" }: Props) {
+export default function TransactionTable({ transactions, onUpdate, initialType = "all", defaultAdvancedOpen = false }: Props) {
   const { data: session } = useSession();
   const userType: UserType = ((session?.user as { userType?: string | null } | undefined)?.userType === "business")
     ? "business"
@@ -72,7 +74,7 @@ export default function TransactionTable({ transactions, onUpdate, initialType =
   const [amountMaxStr, setAmountMaxStr] = useState("");
   const [sortKey, setSortKey] = useState<SortKey>("date");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
-  const [advancedOpen, setAdvancedOpen] = useState(false);
+  const [advancedOpen, setAdvancedOpen] = useState(defaultAdvancedOpen);
   const [showSyntaxHelp, setShowSyntaxHelp] = useState(false);
 
   // Bulk selection

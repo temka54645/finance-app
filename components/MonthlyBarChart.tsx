@@ -3,10 +3,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
 import { AlertTriangle } from "lucide-react";
-import { useSession } from "next-auth/react";
 import { useDataRefresh } from "@/lib/use-data-refresh";
 import CategoryPieChart from "@/components/CategoryPieChart";
-import type { UserType } from "@/lib/categories";
 
 interface SeriesRow {
   year: number;
@@ -43,8 +41,6 @@ function fmtFull(v: number | string | undefined) {
 }
 
 export default function MonthlyBarChart({ readOnly = false, lowCoverage = false, uncategorizedCount = 0 }: Props) {
-  const { data: session } = useSession();
-  const userType = ((session?.user as { userType?: UserType } | undefined)?.userType) ?? "personal";
   const [series, setSeries] = useState<SeriesRow[]>([]);
   const [byCategory, setByCategory] = useState<CatRow[]>([]);
   const [years, setYears] = useState<number[]>([]);
@@ -204,14 +200,12 @@ export default function MonthlyBarChart({ readOnly = false, lowCoverage = false,
             byCategory={catItems}
             type="income"
             title="Орлогын ангилал"
-            userType={userType}
             bare
           />
           <CategoryPieChart
             byCategory={catItems}
             type="expense"
             title="Зарлагын ангилал"
-            userType={userType}
             bare
           />
         </div>

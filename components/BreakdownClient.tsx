@@ -206,6 +206,7 @@ export default function BreakdownClient({ initialType = "all", initialMetric = n
             transactions={transactions}
             onUpdate={emitDataChanged}
             initialType={initialType}
+            defaultAdvancedOpen
           />
         )}
       </section>
