@@ -114,27 +114,29 @@ export async function GET(req: NextRequest) {
       .map(r => ({ counterparty: r.counterparty, total: r.total, count: r.count, uncatCount: r.uncatCount }));
 
     // 3: Хамгийн их давтамжтай харьцагч — орлого+зарлага нийлбэр тоогоор
-    const freqMap = new Map<string, { count: number; total: number }>();
+    const freqMap = new Map<string, { count: number; total: number; uncatCount: number }>();
     // 4: Харьцагч тус бүрийн нэг удаагийн хамгийн өндөр гүйлгээ
-    const maxMap = new Map<string, { max: number; count: number }>();
+    const maxMap = new Map<string, { max: number; count: number; uncatCount: number }>();
     for (const r of grouped) {
-      const e = freqMap.get(r.counterparty) ?? { count: 0, total: 0 };
+      const e = freqMap.get(r.counterparty) ?? { count: 0, total: 0, uncatCount: 0 };
       e.count += r.count;
       e.total += r.total;
+      e.uncatCount += r.uncatCount;
       freqMap.set(r.counterparty, e);
 
-      const m = maxMap.get(r.counterparty) ?? { max: 0, count: 0 };
+      const m = maxMap.get(r.counterparty) ?? { max: 0, count: 0, uncatCount: 0 };
       m.max = Math.max(m.max, r.max);
       m.count += r.count;
+      m.uncatCount += r.uncatCount;
       maxMap.set(r.counterparty, m);
     }
     const mostFrequent = Array.from(freqMap.entries())
-      .map(([counterparty, v]) => ({ counterparty, count: v.count, total: v.total }))
+      .map(([counterparty, v]) => ({ counterparty, count: v.count, total: v.total, uncatCount: v.uncatCount }))
       .sort((a, b) => b.count - a.count)
       .slice(0, limit);
 
     const largestParties = Array.from(maxMap.entries())
-      .map(([counterparty, v]) => ({ counterparty, max: v.max, count: v.count }))
+      .map(([counterparty, v]) => ({ counterparty, max: v.max, count: v.count, uncatCount: v.uncatCount }))
       .sort((a, b) => b.max - a.max)
       .slice(0, limit);
 

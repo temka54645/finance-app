@@ -10,7 +10,6 @@ import {
   ArrowUpRight,
   ArrowDownRight,
   ArrowRight,
-  AlertTriangle,
 } from "lucide-react";
 import { useDataRefresh } from "@/lib/use-data-refresh";
 
@@ -18,8 +17,6 @@ interface TopRow {
   counterparty: string;
   total: number;
   count: number;
-  /** Энэ харьцагчийн гүйлгээнүүдээс ангилагдаагүй нь хэд вэ. */
-  uncatCount?: number;
 }
 
 interface LargestRow {
@@ -100,42 +97,19 @@ function RankRow({
   name,
   primary,
   secondary,
-  uncatCount = 0,
 }: {
   rank: number;
   name: string;
   primary: string;
   secondary: string;
-  /** >0 бол энэ мөрийг "ангилагдаагүй гүйлгээтэй" гэж тодотгоно. */
-  uncatCount?: number;
 }) {
-  const flagged = uncatCount > 0;
   return (
-    <li
-      className={`flex items-center gap-3 py-1.5 ${
-        flagged ? "-mx-2 rounded-lg border-l-2 border-amber-400 bg-amber-50/70 px-2" : ""
-      }`}
-    >
-      <span
-        className={`flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full text-[10px] font-semibold ring-1 ${
-          flagged ? "bg-amber-100 text-amber-700 ring-amber-300" : "bg-white text-slate-500 ring-slate-200"
-        }`}
-      >
+    <li className="flex items-center gap-3 py-1.5">
+      <span className="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full bg-white text-[10px] font-semibold text-slate-500 ring-1 ring-slate-200">
         {rank}
       </span>
-      <span className="flex min-w-0 flex-1 items-center gap-1.5">
-        <span className="min-w-0 truncate text-sm text-slate-700" title={name}>
-          {name}
-        </span>
-        {flagged && (
-          <span
-            className="inline-flex flex-shrink-0 items-center gap-0.5 rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700"
-            title={`${uncatCount} гүйлгээ ангилагдаагүй — дүн бүрэн бус байж болзошгүй`}
-          >
-            <AlertTriangle className="h-2.5 w-2.5" />
-            {uncatCount} ангилаагүй
-          </span>
-        )}
+      <span className="min-w-0 flex-1 truncate text-sm text-slate-700" title={name}>
+        {name}
       </span>
       <span className="flex-shrink-0 text-right">
         <span className="block text-sm font-semibold tabular-nums text-slate-900">{primary}</span>
@@ -242,7 +216,6 @@ export default function CounterpartyInsights({ year, month }: Props = {}) {
                   name={r.counterparty}
                   primary={fmt(r.total)}
                   secondary={`${r.count} гүйлгээ`}
-                  uncatCount={r.uncatCount}
                 />
               ))}
             </ul>
@@ -268,7 +241,6 @@ export default function CounterpartyInsights({ year, month }: Props = {}) {
                   name={r.counterparty}
                   primary={fmt(r.total)}
                   secondary={`${r.count} гүйлгээ`}
-                  uncatCount={r.uncatCount}
                 />
               ))}
             </ul>

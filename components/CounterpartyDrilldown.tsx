@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import { Loader2, ChevronDown, ChevronRight } from "lucide-react";
+import { Loader2, ChevronDown, ChevronRight, AlertTriangle } from "lucide-react";
 import TransactionTable from "@/components/TransactionTable";
 import { emitDataChanged, useDataRefresh } from "@/lib/use-data-refresh";
 
@@ -23,13 +23,15 @@ interface PartyRow {
   counterparty: string;
   primary: string;
   secondary: string;
+  /** Энэ харьцагчийн ангилагдаагүй гүйлгээний тоо (>0 бол тодотгоно). */
+  uncatCount: number;
 }
 
 interface InsightsData {
-  topIncome: { counterparty: string; total: number; count: number }[];
-  topExpense: { counterparty: string; total: number; count: number }[];
-  mostFrequent: { counterparty: string; count: number; total: number }[];
-  largestParties: { counterparty: string; max: number; count: number }[];
+  topIncome: { counterparty: string; total: number; count: number; uncatCount: number }[];
+  topExpense: { counterparty: string; total: number; count: number; uncatCount: number }[];
+  mostFrequent: { counterparty: string; count: number; total: number; uncatCount: number }[];
+  largestParties: { counterparty: string; max: number; count: number; uncatCount: number }[];
 }
 
 export const METRIC_META: Record<Metric, { label: string; type?: "income" | "expense" }> = {
@@ -50,24 +52,28 @@ function toRows(metric: Metric, data: InsightsData): PartyRow[] {
         counterparty: r.counterparty,
         primary: fmt(r.total),
         secondary: `${r.count} гүйлгээ`,
+        uncatCount: r.uncatCount,
       }));
     case "expense":
       return data.topExpense.map(r => ({
         counterparty: r.counterparty,
         primary: fmt(r.total),
         secondary: `${r.count} гүйлгээ`,
+        uncatCount: r.uncatCount,
       }));
     case "frequent":
       return data.mostFrequent.map(r => ({
         counterparty: r.counterparty,
         primary: `${r.count} удаа`,
         secondary: fmt(r.total),
+        uncatCount: r.uncatCount,
       }));
     case "largest":
       return data.largestParties.map(r => ({
         counterparty: r.counterparty,
         primary: fmt(r.max),
         secondary: `${r.count} гүйлгээ`,
+        uncatCount: r.uncatCount,
       }));
   }
 }
@@ -176,17 +182,33 @@ export default function CounterpartyDrilldown({ metric, year, month }: Props) {
       {rows.map((r, i) => {
         const isOpen = open === r.counterparty;
         const txs = txCache[r.counterparty];
+        const flagged = r.uncatCount > 0;
         return (
-          <li key={r.counterparty}>
+          <li key={r.counterparty} className={flagged ? "border-l-2 border-amber-400 bg-amber-50/50" : ""}>
             <button
               onClick={() => toggle(r.counterparty)}
               className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-slate-50"
             >
-              <span className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-slate-100 text-[11px] font-semibold text-slate-500">
+              <span
+                className={`flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full text-[11px] font-semibold ${
+                  flagged ? "bg-amber-100 text-amber-700" : "bg-slate-100 text-slate-500"
+                }`}
+              >
                 {i + 1}
               </span>
-              <span className="min-w-0 flex-1 truncate text-sm font-medium text-slate-800" title={r.counterparty}>
-                {r.counterparty}
+              <span className="flex min-w-0 flex-1 items-center gap-2">
+                <span className="min-w-0 truncate text-sm font-medium text-slate-800" title={r.counterparty}>
+                  {r.counterparty}
+                </span>
+                {flagged && (
+                  <span
+                    className="inline-flex flex-shrink-0 items-center gap-0.5 rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700"
+                    title={`${r.uncatCount} гүйлгээ ангилагдаагүй — дүн бүрэн бус байж болзошгүй. Дэлгэж ангилна уу.`}
+                  >
+                    <AlertTriangle className="h-2.5 w-2.5" />
+                    {r.uncatCount} ангилаагүй
+                  </span>
+                )}
               </span>
               <span className="flex-shrink-0 text-right">
                 <span className="block text-sm font-semibold tabular-nums text-slate-900">{r.primary}</span>
