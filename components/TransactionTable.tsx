@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useEffect, useRef } from "react";
+import { useState, useMemo, useEffect, useRef, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import { useSession } from "next-auth/react";
 import {
   Pencil, Check, X, Trash2, TrendingUp, TrendingDown, Search, Filter, Landmark,
@@ -191,6 +191,18 @@ export default function TransactionTable({ transactions, onUpdate, initialType =
     });
     setEditId(null);
     onUpdate();
+  };
+
+  // Ангилал хийх явцыг хурдасгана: Enter → хадгалах, Esc → болих.
+  // Ингэснээр хол байрлах ✓ товч руу зайлшгүй очих/scroll хийх шаардлагагүй.
+  const onEditKeyDown = (e: ReactKeyboardEvent) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      save();
+    } else if (e.key === "Escape") {
+      e.preventDefault();
+      setEditId(null);
+    }
   };
 
   const remove = async (id: string) => {
@@ -722,7 +734,7 @@ export default function TransactionTable({ transactions, onUpdate, initialType =
                 <th className="px-4 py-3 text-left">{sortHeader("category", "Категори")}</th>
                 <th className="px-4 py-3 text-right">{sortHeader("amount", "Дүн", "right")}</th>
                 <th className="px-4 py-3 text-left">Тэмдэглэл</th>
-                <th className="px-4 py-3 text-center">Үйлдэл</th>
+                <th className="px-4 py-3 text-center sticky right-0 z-20 bg-gray-50">Үйлдэл</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
@@ -771,6 +783,7 @@ export default function TransactionTable({ transactions, onUpdate, initialType =
                       <select
                         value={editData.type}
                         onChange={e => setEditData(prev => ({ ...prev, type: e.target.value, category: "" }))}
+                        onKeyDown={onEditKeyDown}
                         className="border rounded px-2 py-1 text-xs w-24"
                       >
                         <option value="income">Орлого</option>
@@ -790,6 +803,7 @@ export default function TransactionTable({ transactions, onUpdate, initialType =
                       <select
                         value={editData.category}
                         onChange={e => setEditData(prev => ({ ...prev, category: e.target.value }))}
+                        onKeyDown={onEditKeyDown}
                         className="border rounded px-2 py-1 text-xs w-44"
                       >
                         <option value="">— Сонгох —</option>
@@ -833,6 +847,7 @@ export default function TransactionTable({ transactions, onUpdate, initialType =
                       <input
                         value={editData.note}
                         onChange={e => setEditData(prev => ({ ...prev, note: e.target.value }))}
+                        onKeyDown={onEditKeyDown}
                         placeholder="Тэмдэглэл..."
                         className="border rounded px-2 py-1 text-xs w-32"
                       />
@@ -840,7 +855,7 @@ export default function TransactionTable({ transactions, onUpdate, initialType =
                       <span className="text-gray-400 text-xs">{t.note || "—"}</span>
                     )}
                   </td>
-                  <td className="px-4 py-3">
+                  <td className={`px-4 py-3 sticky right-0 z-10 ${isSelected ? "bg-blue-50" : "bg-white"} shadow-[-8px_0_8px_-8px_rgba(0,0,0,0.08)]`}>
                     <div className="flex items-center justify-center gap-1">
                       {editId === t.id ? (
                         <>
