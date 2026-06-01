@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { requireUserId, UnauthorizedError } from "@/lib/auth-helpers";
-
-const UNCATEGORIZED = ["Бусад орлого", "Бусад зарлага", "Ангилаагүй"];
+import { UNCATEGORIZED_CATEGORIES as UNCATEGORIZED } from "@/lib/categories";
 
 interface Row {
   year: number;

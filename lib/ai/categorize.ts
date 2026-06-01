@@ -1,6 +1,7 @@
 import {
   getIncomeCategoryNames,
   getExpenseCategoryNames,
+  UNCATEGORIZED_CATEGORY,
   type UserType,
 } from "@/lib/categories";
 
@@ -66,8 +67,10 @@ export function categorizeTransactions(
 ): CategorizationResult[] {
   if (transactions.length === 0) return [];
 
-  const fallbackIncome = "Бусад орлого";
-  const fallbackExpense = "Бусад зарлага";
+  // Таньж чадаагүй гүйлгээг "Ангилаагүй" болгож тэмдэглэнэ — review queue-д орно.
+  // ("Бусад орлого/зарлага" нь хэрэглэгчийн зориуд сонгох ангилал тул энд хэрэглэхгүй.)
+  const fallbackIncome = UNCATEGORIZED_CATEGORY;
+  const fallbackExpense = UNCATEGORIZED_CATEGORY;
 
   // Keyword дүрмээр түрүүлж шалгана, тааруулж чадаагүйг regex fallback-аар ангилна.
   const unmatched: TransactionInput[] = [];

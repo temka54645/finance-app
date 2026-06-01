@@ -247,6 +247,15 @@ export function getCategoryMeta(name: string): CategoryMeta | null {
   return CATEGORY_META.get(name) ?? null;
 }
 
+// ── Uncategorized sentinel ───────────────────────────────────────
+// "Ангилаагүй" — AI/regex автоматаар таньж чадаагүй, ХАРААХАН ангилагдаагүй
+// гүйлгээний цорын ганц тэмдэглэгээ (review queue-д орно).
+//
+// ⚠ "Бусад орлого"/"Бусад зарлага" нь хэрэглэгчийн ЗОРИУД сонгож болох жинхэнэ
+// каталог ангилал тул "ангилаагүй" гэж тооцохгүй — сонгоход review-оос хасагдана.
+export const UNCATEGORIZED_CATEGORY = "Ангилаагүй";
+export const UNCATEGORIZED_CATEGORIES: string[] = [UNCATEGORIZED_CATEGORY];
+
 // ── Public exports ───────────────────────────────────────────────
 
 export function getIncomeGroups(userType: UserType): CategoryGroup[] {

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { Prisma } from "@/app/generated/prisma/client";
 import { requireUserId, UnauthorizedError } from "@/lib/auth-helpers";
+import { UNCATEGORIZED_CATEGORIES as UNCATEGORIZED } from "@/lib/categories";
 
 // Харьцагч (counterparty) дээр суурилсан үзүүлэлтүүд.
 // counterparty нь чөлөөт текст тул яг тэр стрингээр нь бүлэглэнэ
@@ -9,9 +10,6 @@ import { requireUserId, UnauthorizedError } from "@/lib/auth-helpers";
 const TOP_N = 8;
 // full=1 (задаргааны хуудас) — бүх харьцагчийг буцаах дээд хязгаар.
 const FULL_N = 300;
-
-// "Ангилаагүй" гэж тооцох категориуд — dashboard/reports-той ижил тодорхойлолт.
-const UNCATEGORIZED = ["Бусад орлого", "Бусад зарлага", "Ангилаагүй"];
 
 interface GroupRow {
   counterparty: string;

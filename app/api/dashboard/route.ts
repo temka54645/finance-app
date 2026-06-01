@@ -1,10 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { requireUserId, UnauthorizedError } from "@/lib/auth-helpers";
-
-// "Ангилаагүй" гэх мэт ангилагдаагүй гэж тооцох категориуд —
-// /api/transactions?uncategorized=true болон reports-той ижил тодорхойлолт.
-const UNCATEGORIZED = ["Бусад орлого", "Бусад зарлага", "Ангилаагүй"];
+import { UNCATEGORIZED_CATEGORIES as UNCATEGORIZED } from "@/lib/categories";
 
 function pctChange(curr: number, prev: number): number | null {
   if (prev === 0) return null; // өмнөх суурь 0 бол хувь утгагүй
