@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
+import { AlertTriangle } from "lucide-react";
 import { useSession } from "next-auth/react";
 import { useDataRefresh } from "@/lib/use-data-refresh";
 import CategoryPieChart from "@/components/CategoryPieChart";
@@ -25,6 +26,9 @@ interface CatRow {
 interface Props {
   /** Уншихад зориулсан горим — жил сонгох товчгүй, зөвхөн сүүлийн жилийг харуулна. */
   readOnly?: boolean;
+  /** Ангиллын хамрах хүрээ 80%-аас бага бол ангиллын графикт сэрэмжлүүлэг харуулна. */
+  lowCoverage?: boolean;
+  uncategorizedCount?: number;
 }
 
 function fmtShort(n: number) {
@@ -38,7 +42,7 @@ function fmtFull(v: number | string | undefined) {
   return n.toLocaleString("mn-MN", { maximumFractionDigits: 0 }) + "₮";
 }
 
-export default function MonthlyBarChart({ readOnly = false }: Props) {
+export default function MonthlyBarChart({ readOnly = false, lowCoverage = false, uncategorizedCount = 0 }: Props) {
   const { data: session } = useSession();
   const userType = ((session?.user as { userType?: UserType } | undefined)?.userType) ?? "personal";
   const [series, setSeries] = useState<SeriesRow[]>([]);
@@ -181,6 +185,17 @@ export default function MonthlyBarChart({ readOnly = false }: Props) {
           </BarChart>
         </ResponsiveContainer>
       </div>
+
+      {/* Ангиллын графикийн бүрэн бус байдлын сэрэмжлүүлэг */}
+      {hasData && lowCoverage && (
+        <div className="mt-4 flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+          <AlertTriangle className="mt-0.5 h-3.5 w-3.5 flex-shrink-0" />
+          <span>
+            Энэ дүгнэлт бүрэн бус байна — {uncategorizedCount} гүйлгээ ангилагдаагүй тул ангиллын
+            хуваарилалт дутуу харагдаж байна.
+          </span>
+        </div>
+      )}
 
       {/* Доод хэсэг — сонгосон жилүүдийн орлого/зарлагын ангиллын pie chart */}
       {hasData && (
