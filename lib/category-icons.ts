@@ -3,6 +3,7 @@ import {
   Wrench, Receipt, Users, TrendingUp, RotateCcw, Percent, HelpCircle, FileQuestion,
   type LucideIcon,
 } from "lucide-react";
+import { getCategoryMeta } from "@/lib/categories";
 
 interface CategoryStyle {
   icon: LucideIcon;
@@ -39,6 +40,10 @@ const STYLES: Record<string, CategoryStyle> = {
 const FALLBACK: CategoryStyle = STYLES["Ангилаагүй"];
 
 export function getCategoryStyle(category: string): CategoryStyle {
+  // 1) Нэгдсэн каталог (lib/categories.ts) — бүх стандарт ангиллыг хамарна.
+  const meta = getCategoryMeta(category);
+  if (meta) return { icon: meta.icon, bg: meta.bg, text: meta.color };
+  // 2) Хуучин нэрс (каталогт байхгүй боловч хадгалагдсан байж болзошгүй) → 3) fallback.
   return STYLES[category] ?? FALLBACK;
 }
 

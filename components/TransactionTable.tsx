@@ -8,6 +8,7 @@ import {
   CheckSquare, Square, Tag, Loader2,
 } from "lucide-react";
 import { getCategoryStyle } from "@/lib/category-icons";
+import { resolveCustomCategoryIcon } from "@/lib/custom-category-icons";
 import { useCustomCategories } from "@/lib/use-custom-categories";
 import { getIncomeGroups, getExpenseGroups, type UserType } from "@/lib/categories";
 import { getBankMeta } from "@/lib/bankMeta";
@@ -48,6 +49,13 @@ export default function TransactionTable({ transactions, onUpdate, initialType =
     ? "business"
     : "personal";
   const { income: customIncome, expense: customExpense } = useCustomCategories(userType);
+
+  // Хэрэглэгчийн нэмсэн ангиллын нэр → сонгосон лого (icon key) хайлт.
+  const customIconByName = useMemo(() => {
+    const m = new Map<string, string | null | undefined>();
+    for (const c of [...customIncome, ...customExpense]) m.set(c.name, c.icon);
+    return m;
+  }, [customIncome, customExpense]);
 
   // Editing state
   const [editId, setEditId] = useState<string | null>(null);
@@ -802,7 +810,11 @@ export default function TransactionTable({ transactions, onUpdate, initialType =
                       </select>
                     ) : (() => {
                       const style = getCategoryStyle(t.category);
-                      const Icon = style.icon;
+                      // Хэрэглэгчийн өөрийн ангилал бол түүний сонгосон логог эрхэмлэнэ.
+                      const isCustom = customIconByName.has(t.category);
+                      const Icon = isCustom
+                        ? resolveCustomCategoryIcon(customIconByName.get(t.category))
+                        : style.icon;
                       return (
                         <span className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-xs ${style.bg} ${style.text}`}>
                           <Icon className="w-3.5 h-3.5" />

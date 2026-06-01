@@ -222,6 +222,31 @@ const BUSINESS_EXPENSE: CategoryGroup[] = [
   },
 ];
 
+// ── Бүх каталогийн нэр → меta хайлт ───────────────────────────────
+// (getCategoryStyle нь энэ нэгдсэн каталогаас лого/өнгийг олно — тус бүрийг
+//  тусад нь давхардуулж бичихгүй.)
+const ALL_CATEGORY_GROUPS: CategoryGroup[][] = [
+  PERSONAL_INCOME, PERSONAL_EXPENSE, BUSINESS_INCOME, BUSINESS_EXPENSE,
+];
+
+export type CategoryMeta = { icon: LucideIcon; color: string; bg: string };
+
+const CATEGORY_META = new Map<string, CategoryMeta>();
+for (const groups of ALL_CATEGORY_GROUPS) {
+  for (const g of groups) {
+    for (const it of g.items) {
+      if (!CATEGORY_META.has(it.name)) {
+        CATEGORY_META.set(it.name, { icon: it.icon, color: it.color, bg: it.bg });
+      }
+    }
+  }
+}
+
+/** Каталогт байгаа ангиллын лого/өнгийг нэрээр нь буцаана. Олдохгүй бол null. */
+export function getCategoryMeta(name: string): CategoryMeta | null {
+  return CATEGORY_META.get(name) ?? null;
+}
+
 // ── Public exports ───────────────────────────────────────────────
 
 export function getIncomeGroups(userType: UserType): CategoryGroup[] {
