@@ -42,8 +42,10 @@ export default function BreakdownClient({ initialType = "all", initialMetric = n
   const [uncategorizedCount, setUncategorizedCount] = useState(0);
   const [loading, setLoading] = useState(true);
 
-  const fetchData = useCallback(async () => {
-    setLoading(true);
+  const fetchData = useCallback(async (opts?: { background?: boolean }) => {
+    // background=true (дата шинэчлэгдсэн event) — байгаа агуулгыг spinner-ээр
+    // битгий орлуул; ингэснээр хүснэгт unmount болохгүй, scroll байрандаа үлдэнэ.
+    if (!opts?.background) setLoading(true);
     try {
       const qs = new URLSearchParams();
       if (year !== "all") qs.set("year", String(year));
@@ -63,12 +65,13 @@ export default function BreakdownClient({ initialType = "all", initialMetric = n
         setTransactions(txs.transactions ?? []);
       }
     } finally {
-      setLoading(false);
+      if (!opts?.background) setLoading(false);
     }
   }, [year, month, metric]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
-  useDataRefresh(fetchData);
+  const refresh = useCallback(() => fetchData({ background: true }), [fetchData]);
+  useDataRefresh(refresh);
 
   const selectYear = (y: number | "all") => {
     setYear(y);

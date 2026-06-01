@@ -109,8 +109,10 @@ export default function CounterpartyDrilldown({ metric, year, month }: Props) {
     setTxCache({});
   }, [metric, year, month]);
 
-  const fetchList = useCallback(async () => {
-    setLoading(true);
+  const fetchList = useCallback(async (opts?: { background?: boolean }) => {
+    // background=true — дата шинэчлэгдсэн event-ээр дахин татахад жагсаалтыг
+    // spinner-ээр битгий орлуул (unmount → scroll алдагдахаас сэргийлнэ).
+    if (!opts?.background) setLoading(true);
     try {
       const qs = scopeQs();
       qs.set("full", "1");
@@ -118,7 +120,7 @@ export default function CounterpartyDrilldown({ metric, year, month }: Props) {
       const data: InsightsData = await res.json();
       setRows(toRows(metric, data));
     } finally {
-      setLoading(false);
+      if (!opts?.background) setLoading(false);
     }
   }, [metric, scopeQs]);
 
@@ -146,7 +148,7 @@ export default function CounterpartyDrilldown({ metric, year, month }: Props) {
   // Дата шинэчлэгдвэл (категори өөрчлөгдөх г.м) жагсаалт + дэлгээстэй мөрийг
   // дахин ачаална — задаргааг хаалгүйгээр.
   const refresh = useCallback(async () => {
-    await fetchList();
+    await fetchList({ background: true });
     const cur = openRef.current;
     if (cur) loadTx(cur);
   }, [fetchList, loadTx]);
