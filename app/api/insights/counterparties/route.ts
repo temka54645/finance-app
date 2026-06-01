@@ -10,12 +10,16 @@ const TOP_N = 8;
 // full=1 (задаргааны хуудас) — бүх харьцагчийг буцаах дээд хязгаар.
 const FULL_N = 300;
 
+// "Ангилаагүй" гэж тооцох категориуд — dashboard/reports-той ижил тодорхойлолт.
+const UNCATEGORIZED = ["Бусад орлого", "Бусад зарлага", "Ангилаагүй"];
+
 interface GroupRow {
   counterparty: string;
   type: string;
   total: number;
   count: number;
   max: number;
+  uncatCount: number;
 }
 
 interface LargestRow {
@@ -70,7 +74,8 @@ export async function GET(req: NextRequest) {
                t."type" AS type,
                SUM(t."amount")::float AS total,
                COUNT(*)::int AS count,
-               MAX(t."amount")::float AS max
+               MAX(t."amount")::float AS max,
+               SUM(CASE WHEN t."category" IN (${Prisma.join(UNCATEGORIZED)}) THEN 1 ELSE 0 END)::int AS "uncatCount"
         FROM "Transaction" t
         JOIN "Statement" s ON s."id" = t."statementId"
         WHERE s."userId" = ${userId}
@@ -100,13 +105,13 @@ export async function GET(req: NextRequest) {
       .filter(r => r.type === "income")
       .sort((a, b) => b.total - a.total)
       .slice(0, limit)
-      .map(r => ({ counterparty: r.counterparty, total: r.total, count: r.count }));
+      .map(r => ({ counterparty: r.counterparty, total: r.total, count: r.count, uncatCount: r.uncatCount }));
 
     const topExpense = grouped
       .filter(r => r.type === "expense")
       .sort((a, b) => b.total - a.total)
       .slice(0, limit)
-      .map(r => ({ counterparty: r.counterparty, total: r.total, count: r.count }));
+      .map(r => ({ counterparty: r.counterparty, total: r.total, count: r.count, uncatCount: r.uncatCount }));
 
     // 3: Хамгийн их давтамжтай харьцагч — орлого+зарлага нийлбэр тоогоор
     const freqMap = new Map<string, { count: number; total: number }>();
