@@ -1,7 +1,15 @@
 import { PDFParse } from "pdf-parse";
 import type { ParsedTransaction } from "./excel";
+import type { StatementMeta } from "./banks";
+import { KHAN_BANK_PDF, parseKhanPdfText, extractKhanPdfMeta } from "./banks/khan";
 
 export type { ParsedTransaction };
+
+export interface PdfParseResult {
+  transactions: ParsedTransaction[];
+  detectedBank: string | null;
+  meta?: StatementMeta;
+}
 
 // Огноо + тайлбар + дүн агуулсан мөрийн pattern-үүд
 const LINE_PATTERNS = [
@@ -38,11 +46,37 @@ function parseAmount(raw: string): number {
   return neg ? -Math.abs(n) : n;
 }
 
-export async function parsePDF(buffer: Buffer): Promise<ParsedTransaction[]> {
+async function extractPdfText(buffer: Buffer): Promise<string> {
   const parser = new PDFParse({ data: new Uint8Array(buffer) });
   const result = await parser.getText();
+  return result.text;
+}
 
-  const lines = result.text
+/**
+ * PDF хуулгыг банк автомат илрүүлэлттэйгээр задлах.
+ * - Эхлээд бүртгэгдсэн банк (ХААН г.м)-ны template-ыг туршина
+ * - Танигдвал тухайн банкны parser + meta-г буцаана
+ * - Танигдахгүй бол ерөнхий (generic) PDF parser ашиглана
+ */
+export async function parsePdfWithBankDetection(buffer: Buffer): Promise<PdfParseResult> {
+  const text = await extractPdfText(buffer);
+
+  if (KHAN_BANK_PDF.detect(text)) {
+    const transactions = parseKhanPdfText(text);
+    if (transactions.length > 0) {
+      return { transactions, detectedBank: KHAN_BANK_PDF.name, meta: extractKhanPdfMeta(text) };
+    }
+  }
+
+  return { transactions: parseGenericPdfText(text), detectedBank: null };
+}
+
+export async function parsePDF(buffer: Buffer): Promise<ParsedTransaction[]> {
+  return (await parsePdfWithBankDetection(buffer)).transactions;
+}
+
+function parseGenericPdfText(text: string): ParsedTransaction[] {
+  const lines = text
     .split("\n")
     .map((l: string) => l.trim())
     .filter((l: string) => l.length > 0);

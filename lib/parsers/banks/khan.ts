@@ -40,6 +40,19 @@ export const KHAN_BANK = {
   },
 };
 
+/**
+ * ХААН Банкны PDF хуулгыг текстээр нь таних.
+ * "Депозит дансны дэлгэрэнгүй хуулга" + Кредит/Дебит гүйлгээ багана.
+ */
+export const KHAN_BANK_PDF = {
+  id: "khan-pdf",
+  name: "ХААН Банк (Khan Bank)",
+  detect: (text: string): boolean =>
+    /депозит дансны[\s\S]*хуулга/i.test(text) &&
+    /кредит гүйлгээ/i.test(text) &&
+    /дебит гүйлгээ/i.test(text),
+};
+
 const COL = {
   date: 0,         // "2026-03-01 20:44:41"
   branch: 1,
@@ -74,6 +87,111 @@ function toNumber(val: unknown): number {
     return isNaN(n) ? 0 : n;
   }
   return 0;
+}
+
+// ── ХААН Банкны PDF хуулга ────────────────────────────────────────
+//
+// PDF хэлбэр ("Депозит дансны дэлгэрэнгүй хуулга"):
+//   Багана: № | Гүйлгээний огноо | Цаг | Салбар | Эхний үлдэгдэл |
+//           Кредит гүйлгээ | Дебит гүйлгээ | Эцсийн үлдэгдэл |
+//           Гүйлгээний утга | Харьцсан данс
+//
+//   pdf-parse-ийн гаргасан текст дэх нэг гүйлгээний мөр:
+//     1 2026/03/02 10:11 5000 17,632.47 -54.80 17,577.67 qpay ... 5111793587
+//   Кредит/Дебит хоёрын зөвхөн нэг нь дүүрсэн тул хоосон багана нурж,
+//   "Эхний үлдэгдэл | Дүн(±) | Эцсийн үлдэгдэл" гэсэн 3 тоо үлдэнэ.
+//   Дүн нь тэмдэгтэй: сөрөг = зарлага (дебит), эерэг = орлого (кредит).
+//   Урт утга нь дараагийн мөр(үүд) рүү таслагдаж болно (multi-line).
+
+// Гүйлгээний эхлэл мөр. groups:
+//  1=№ 2=year 3=month 4=day 5=hour 6=min 7=салбар
+//  8=эхний үлдэгдэл 9=дүн(тэмдэгтэй) 10=эцсийн үлдэгдэл 11=утга+харьцсан данс
+const KHAN_PDF_ROW =
+  /^(\d{1,6})\s+(\d{4})\/(\d{2})\/(\d{2})\s+(\d{2}):(\d{2})\s+(\d+)\s+([\d,]+\.\d{2})\s+(-?[\d,]+\.\d{2})\s+([\d,]+\.\d{2})\s*(.*)$/;
+
+// Хуудас бүрд давтагддаг толгой / хуудасны тэмдэглэгээ — алгасна.
+const KHAN_PDF_SKIP = /^Банк энэхүү хуулгыг|^-- \d+ of \d+ --$|^Хуудас \d/;
+
+/** "2026/03/02" → Date (UTC) */
+function parseKhanSlashDate(s: string): Date | null {
+  const m = s.match(/^(\d{4})\/(\d{2})\/(\d{2})$/);
+  if (!m) return null;
+  return new Date(Date.UTC(+m[1], +m[2] - 1, +m[3]));
+}
+
+interface KhanPdfRow {
+  date: Date;
+  amount: number; // тэмдэгтэй: эерэг=орлого, сөрөг=зарлага
+  descParts: string[];
+}
+
+function flushKhanPdfRow(row: KhanPdfRow | null, out: ParsedTransaction[]): void {
+  if (!row) return;
+  let desc = row.descParts.join(" ").replace(/\s+/g, " ").trim();
+  let counterparty: string | undefined;
+  // Мөрийн төгсгөлийн урт тоо = Харьцсан данс (заримд байхгүй — хураамжийн мөр)
+  const cp = desc.match(/(?:^|\s)(\d{8,})$/);
+  if (cp) {
+    counterparty = cp[1];
+    desc = desc.slice(0, desc.length - cp[1].length).trim();
+  }
+  if (!desc) desc = counterparty ?? "Гүйлгээ";
+  out.push({ date: row.date, description: desc, counterparty, amount: row.amount });
+}
+
+/** ХААН Банкны PDF хуулгын текстээс гүйлгээ задлах. */
+export function parseKhanPdfText(text: string): ParsedTransaction[] {
+  const lines = text.split("\n").map(l => l.trim()).filter(l => l.length > 0);
+  const out: ParsedTransaction[] = [];
+  let current: KhanPdfRow | null = null;
+
+  for (const line of lines) {
+    if (/^Нийт дүн:/.test(line)) break; // хуулгын төгсгөлийн нийлбэр
+    if (KHAN_PDF_SKIP.test(line)) continue;
+
+    const m = line.match(KHAN_PDF_ROW);
+    if (m) {
+      flushKhanPdfRow(current, out);
+      const date = new Date(Date.UTC(+m[2], +m[3] - 1, +m[4], +m[5], +m[6]));
+      const amount = toNumber(m[9]); // тэмдгийг хадгална
+      if (isNaN(date.getTime()) || amount === 0) { current = null; continue; }
+      current = { date, amount, descParts: m[11] ? [m[11]] : [] };
+    } else if (current) {
+      // Өмнөх гүйлгээний утгын үргэлжлэл (multi-line)
+      current.descParts.push(line);
+    }
+    // current === null үед толгойн metadata мөрүүдийг үл хэрэгснэ
+  }
+  flushKhanPdfRow(current, out);
+  return out;
+}
+
+/** ХААН Банкны PDF текстээс period + balance metadata. */
+export function extractKhanPdfMeta(text: string): StatementMeta {
+  const meta: StatementMeta = {};
+
+  const im = text.match(/Интервал:\s*(\d{4}\/\d{2}\/\d{2})\s*[-–—]\s*(\d{4}\/\d{2}\/\d{2})/);
+  if (im) {
+    const start = parseKhanSlashDate(im[1]);
+    const end = parseKhanSlashDate(im[2]);
+    if (start) meta.periodStart = start;
+    if (end) meta.periodEnd = new Date(Date.UTC(
+      end.getUTCFullYear(), end.getUTCMonth(), end.getUTCDate(), 23, 59, 59));
+  }
+
+  // Эхний гүйлгээний "Эхний үлдэгдэл", сүүлчийн гүйлгээний "Эцсийн үлдэгдэл"
+  const lines = text.split("\n").map(l => l.trim());
+  let first: RegExpMatchArray | null = null;
+  let last: RegExpMatchArray | null = null;
+  for (const line of lines) {
+    if (/^Нийт дүн:/.test(line)) break;
+    const m = line.match(KHAN_PDF_ROW);
+    if (m) { if (!first) first = m; last = m; }
+  }
+  if (first) meta.openingBalance = toNumber(first[8]);
+  if (last) meta.closingBalance = toNumber(last[10]);
+
+  return meta;
 }
 
 export function parseKhanBank(buffer: Buffer): ParsedTransaction[] {

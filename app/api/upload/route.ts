@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { requireUserId, UnauthorizedError } from "@/lib/auth-helpers";
-import { parsePDF } from "@/lib/parsers/pdf";
+import { parsePdfWithBankDetection } from "@/lib/parsers/pdf";
 import { parseCSV, extractRawRows, type ParsedTransaction } from "@/lib/parsers/excel";
 import { parseWithBankDetection, type StatementMeta } from "@/lib/parsers/banks";
 import { categorizeTransactions } from "@/lib/ai/categorize";
@@ -38,7 +38,10 @@ export async function POST(req: NextRequest) {
 
     const tParseStart = performance.now();
     if (ext === "pdf") {
-      parsed = await parsePDF(buffer);
+      const result = await parsePdfWithBankDetection(buffer);
+      parsed = result.transactions;
+      detectedBank = result.detectedBank;
+      stmtMeta = result.meta;
     } else if (ext === "csv") {
       parsed = parseCSV(buffer);
     } else if (ext === "xlsx" || ext === "xls") {
