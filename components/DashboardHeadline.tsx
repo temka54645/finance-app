@@ -2,6 +2,7 @@
 
 import { Wallet, ArrowDownUp, Hourglass, ArrowUpRight, ArrowDownRight, Minus } from "lucide-react";
 import type { ReactNode } from "react";
+import FormulaTip from "@/components/FormulaTip";
 
 export interface PeriodOverPeriod {
   current: { label: string; inflow: number; outflow: number; net: number };
@@ -48,7 +49,7 @@ function TrendBadge({ pct, goodWhenUp }: { pct: number | null; goodWhenUp: boole
 }
 
 function BigCard({
-  label, value, sub, icon, critical, muted,
+  label, value, sub, icon, critical, muted, formula,
 }: {
   label: string;
   value: ReactNode;
@@ -56,17 +57,22 @@ function BigCard({
   icon: ReactNode;
   critical?: boolean;
   muted?: boolean;
+  /** Тухайн дүнгийн тооцооллын томьёо (ⓘ tooltip). */
+  formula: string;
 }) {
   return (
     <div
-      className={`relative overflow-hidden rounded-2xl border p-5 shadow-lg shadow-slate-200/60 ${
+      className={`relative rounded-2xl border p-5 shadow-lg shadow-slate-200/60 ${
         critical ? "border-rose-300 bg-rose-50" : "border-slate-200 bg-white"
       }`}
     >
       <div className="flex items-start justify-between">
-        <p className={`text-xs font-medium uppercase tracking-wider ${critical ? "text-rose-600" : "text-slate-500"}`}>
-          {label}
-        </p>
+        <div className="flex items-center gap-1.5">
+          <p className={`text-xs font-medium uppercase tracking-wider ${critical ? "text-rose-600" : "text-slate-500"}`}>
+            {label}
+          </p>
+          <FormulaTip text={formula} />
+        </div>
         <span className={`flex h-8 w-8 items-center justify-center rounded-lg ${critical ? "bg-rose-100 text-rose-700" : "bg-slate-100 text-slate-600"}`}>
           {icon}
         </span>
@@ -111,6 +117,11 @@ export default function DashboardHeadline({
               ? `${accountCount} дансны эцсийн үлдэгдлийн нийлбэр`
               : "Хуулгын эцсийн үлдэгдэл олдсонгүй — дансны үлдэгдэл шаардлагатай"
           }
+          formula={
+            hasClosingBalance && cashBalance !== null
+              ? `Данс бүрийн хамгийн сүүлийн хуулгын эцсийн үлдэгдлийн нийлбэр.\nΣ ${accountCount} данс = ${fmtSigned(cashBalance)}`
+              : "Данс бүрийн хамгийн сүүлийн хуулгын эцсийн үлдэгдлийн нийлбэр.\nХуулгад эцсийн үлдэгдэл олдоогүй тул тооцох боломжгүй."
+          }
         />
 
         {/* Цэвэр мөнгөн урсгал */}
@@ -127,6 +138,7 @@ export default function DashboardHeadline({
               </span>
             ) : netCritical ? "Зарлага орлогоосоо давсан" : "Орлого зарлагын зөрүү"
           }
+          formula={`Нийт орлого − Нийт зарлага.\nБүх хугацааны орлого ба зарлагын зөрүү = ${fmtSigned(netCashFlow)}`}
         />
 
         {/* Бэлэн мөнгөний нөөц (runway) */}
@@ -142,6 +154,11 @@ export default function DashboardHeadline({
               : hasClosingBalance
                 ? "Зарлага бүртгэгдээгүй"
                 : "Дансны үлдэгдэл шаардлагатай"
+          }
+          formula={
+            runwayMonths !== null && cashBalance !== null
+              ? `Нийт бэлэн мөнгө ÷ сарын дундаж зарлага.\nСарын дундаж зарлага = нийт зарлага ÷ гүйлгээтэй сарын тоо.\n${fmtSigned(cashBalance)} ÷ ${fmt(avgMonthlyOutflow)} = ${runwayText(runwayMonths)}\nОдоогийн бэлэн мөнгө хэдэн сар хүрэлцэхийг харуулна.`
+              : "Нийт бэлэн мөнгө ÷ сарын дундаж зарлага.\nДансны эцсийн үлдэгдэл эсвэл зарлага бүртгэгдээгүй тул тооцох боломжгүй."
           }
         />
       </div>

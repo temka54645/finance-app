@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { AlertTriangle, CheckCircle2, ArrowRight } from "lucide-react";
+import FormulaTip from "@/components/FormulaTip";
 
 interface Props {
   total: number;
@@ -27,7 +28,10 @@ export default function CategorizationCoverage({
     <div className={`rounded-2xl border p-4 shadow-sm ${low ? "border-amber-300 bg-amber-50" : "border-slate-200 bg-white"}`}>
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="text-xs font-medium uppercase tracking-wider text-slate-500">Ангиллын хамрах хүрээ</p>
+          <p className="flex items-center gap-1.5 text-xs font-medium uppercase tracking-wider text-slate-500">
+            Ангиллын хамрах хүрээ
+            <FormulaTip text={`Ангилагдсан гүйлгээ ÷ нийт гүйлгээ × 100.\n${categorized} ÷ ${total} × 100 = ${rounded}%`} />
+          </p>
           <p className="mt-1 flex items-baseline gap-2">
             <span className={`text-2xl font-bold tabular-nums ${low ? "text-amber-700" : "text-emerald-700"}`}>{rounded}%</span>
             <span className="text-xs text-slate-500">{categorized}/{total} гүйлгээ ангилагдсан</span>

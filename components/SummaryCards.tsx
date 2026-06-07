@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { TrendingUp, TrendingDown, Wallet, ArrowRight } from "lucide-react";
 import type { ReactNode } from "react";
+import FormulaTip from "@/components/FormulaTip";
 
 interface Props {
   totalIncome: number;
@@ -50,6 +51,7 @@ function StatCard({
   icon,
   accent,
   href,
+  formula,
 }: {
   label: string;
   value: string;
@@ -58,13 +60,21 @@ function StatCard({
   accent: Accent;
   /** Өгвөл картын доор задаргаа руу шилжих товч харагдана. */
   href?: string;
+  /** Тухайн дүнгийн тооцооллын томьёо (ⓘ tooltip). */
+  formula: string;
 }) {
   const p = PALETTES[accent];
   return (
-    <div className="group relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-5 shadow-lg shadow-slate-200/60 transition-all duration-300 hover:shadow-xl hover:shadow-slate-200/80 hover:-translate-y-0.5">
-      <div className={`pointer-events-none absolute -right-12 -top-12 h-40 w-40 rounded-full bg-gradient-radial ${p.ring} opacity-80 blur-2xl transition-transform duration-500 group-hover:scale-110`} />
+    <div className="group relative rounded-2xl border border-slate-200 bg-white p-5 shadow-lg shadow-slate-200/60 transition-all duration-300 hover:shadow-xl hover:shadow-slate-200/80 hover:-translate-y-0.5">
+      {/* Гоёлын radial ring — зөвхөн энэ давхаргыг л таслана (tooltip-д саад болохгүй) */}
+      <div className="pointer-events-none absolute inset-0 overflow-hidden rounded-2xl">
+        <div className={`absolute -right-12 -top-12 h-40 w-40 rounded-full bg-gradient-radial ${p.ring} opacity-80 blur-2xl transition-transform duration-500 group-hover:scale-110`} />
+      </div>
       <div className="relative flex items-start justify-between">
-        <p className="text-xs font-medium uppercase tracking-wider text-slate-500">{label}</p>
+        <div className="flex items-center gap-1.5">
+          <p className="text-xs font-medium uppercase tracking-wider text-slate-500">{label}</p>
+          <FormulaTip text={formula} />
+        </div>
         <span className={`flex h-8 w-8 items-center justify-center rounded-lg ${p.chip}`}>
           {icon}
         </span>
@@ -101,6 +111,7 @@ export default function SummaryCards({
         icon={<TrendingUp className="h-4 w-4" />}
         accent="emerald"
         href={breakdownLinks ? "/breakdown?type=income" : undefined}
+        formula={`Бүх «орлого» төрлийн гүйлгээний дүнгийн нийлбэр.\nΣ ${incomeCount} гүйлгээ = ${fmt(totalIncome)}`}
       />
       <StatCard
         label="Нийт зарлага"
@@ -109,6 +120,7 @@ export default function SummaryCards({
         icon={<TrendingDown className="h-4 w-4" />}
         accent="rose"
         href={breakdownLinks ? "/breakdown?type=expense" : undefined}
+        formula={`Бүх «зарлага» төрлийн гүйлгээний дүнгийн нийлбэр.\nΣ ${expenseCount} гүйлгээ = ${fmt(totalExpense)}`}
       />
       <StatCard
         label="Үлдэгдэл"
@@ -117,6 +129,7 @@ export default function SummaryCards({
         icon={<Wallet className="h-4 w-4" />}
         accent={balance >= 0 ? "blue" : "orange"}
         href={breakdownLinks ? "/breakdown" : undefined}
+        formula={`Нийт орлого − Нийт зарлага.\n${fmt(totalIncome)} − ${fmt(totalExpense)} = ${balance >= 0 ? "+" : "−"}${fmt(Math.abs(balance))}`}
       />
     </div>
   );
