@@ -225,7 +225,10 @@ export default function DashboardHeadline({
               <TrendBadge pct={pctChange(curPoint.outflow, prevPoint.outflow)} goodWhenUp={false} />
             </div>
             <div>
-              <p className="text-xs text-slate-500">Цэвэр урсгал</p>
+              <p className="flex items-center gap-1 text-xs text-slate-500">
+                Цэвэр урсгал
+                <FormulaTip text={`Тухайн сарын орлого − зарлага.\n${fmt(curPoint.inflow)} − ${fmt(curPoint.outflow)} = ${fmtSigned(curPoint.net)}`} />
+              </p>
               <p className={`mt-0.5 text-base font-semibold tabular-nums ${curPoint.net >= 0 ? "text-slate-800" : "text-rose-600"}`}>
                 {fmtSigned(curPoint.net)}
               </p>
