@@ -6,7 +6,7 @@ import AppShell from "@/components/AppShell";
 import SummaryCards from "@/components/SummaryCards";
 import MonthlyBarChart from "@/components/MonthlyBarChart";
 import CounterpartyInsights from "@/components/CounterpartyInsights";
-import DashboardHeadline, { type PeriodOverPeriod } from "@/components/DashboardHeadline";
+import DashboardHeadline, { type PeriodOverPeriod, type PeriodPoint } from "@/components/DashboardHeadline";
 import CategorizationCoverage from "@/components/CategorizationCoverage";
 import PerAccountBreakdown, { type AccountRow } from "@/components/PerAccountBreakdown";
 import MissingDataSection from "@/components/MissingDataSection";
@@ -39,6 +39,7 @@ interface DashboardData {
   };
   perAccount: AccountRow[];
   periodOverPeriod: PeriodOverPeriod | null;
+  periodSeries?: PeriodPoint[];
 }
 
 export default function DashboardClient() {
@@ -97,6 +98,7 @@ export default function DashboardClient() {
               avgMonthlyOutflow={dashboard.avgMonthlyOutflow}
               accountCount={dashboard.perAccount.length}
               periodOverPeriod={dashboard.periodOverPeriod}
+              periodSeries={dashboard.periodSeries}
             />
           )}
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { Wallet, ArrowDownUp, Hourglass, ArrowUpRight, ArrowDownRight, Minus } from "lucide-react";
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import FormulaTip from "@/components/FormulaTip";
 
 export interface PeriodOverPeriod {
@@ -12,6 +12,15 @@ export interface PeriodOverPeriod {
   netPct: number | null;
 }
 
+/** Нэг сарын орлого/зарлага/цэвэр урсгал — харьцуулалтын сонголтод. */
+export interface PeriodPoint {
+  key: string;
+  label: string;
+  inflow: number;
+  outflow: number;
+  net: number;
+}
+
 interface Props {
   cashBalance: number | null;
   hasClosingBalance: boolean;
@@ -20,6 +29,14 @@ interface Props {
   avgMonthlyOutflow: number;
   accountCount: number;
   periodOverPeriod: PeriodOverPeriod | null;
+  /** Бүх сарын цуваа (буурахаар) — харьцуулах сар сонгоход. */
+  periodSeries?: PeriodPoint[];
+}
+
+/** Өмнөх суурь 0 бол хувь утгагүй. */
+function pctChange(curr: number, prev: number): number | null {
+  if (prev === 0) return null;
+  return ((curr - prev) / prev) * 100;
 }
 
 function fmt(n: number) {
@@ -89,12 +106,20 @@ function BigCard({
 
 export default function DashboardHeadline({
   cashBalance, hasClosingBalance, netCashFlow, runwayMonths, avgMonthlyOutflow,
-  accountCount, periodOverPeriod,
+  accountCount, periodOverPeriod, periodSeries = [],
 }: Props) {
   const balanceCritical = cashBalance !== null && cashBalance < 0;
   const netCritical = netCashFlow < 0;
   // Бэлэн мөнгөний нөөц 3 сараас бага бол анхааруулга (улаан)
   const runwayCritical = runwayMonths !== null && runwayMonths < 3;
+
+  // Харьцуулах сарын сонголт — өмнөх сартай байж л харьцуулна (хамгийн сүүлийн
+  // сарыг анхдагчаар). Цуваа буурахаар тул өмнөх нь дараагийн индекс.
+  const comparable = periodSeries.length >= 2 ? periodSeries.slice(0, -1) : [];
+  const [selectedKey, setSelectedKey] = useState<string>(comparable[0]?.key ?? "");
+  const selIdx = periodSeries.findIndex((p) => p.key === selectedKey);
+  const curPoint = selIdx >= 0 ? periodSeries[selIdx] : null;
+  const prevPoint = selIdx >= 0 ? periodSeries[selIdx + 1] ?? null : null;
 
   const runwayText = (m: number) => {
     if (m >= 12) return `${(m / 12).toFixed(1)} жил`;
@@ -163,32 +188,48 @@ export default function DashboardHeadline({
         />
       </div>
 
-      {/* Үе-үеийн харьцуулалт */}
-      {periodOverPeriod && (
+      {/* Үе-үеийн харьцуулалт — харьцуулах сар сонгох боломжтой */}
+      {curPoint && prevPoint && (
         <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-          <div className="mb-3 flex items-baseline justify-between gap-2">
-            <h3 className="text-sm font-semibold text-slate-700">Өмнөх үетэй харьцуулалт</h3>
-            <p className="text-xs text-slate-400">
-              {periodOverPeriod.current.label} · өмнө нь {periodOverPeriod.previous.label}
-            </p>
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <h3 className="flex items-center gap-1.5 text-sm font-semibold text-slate-700">
+              Өмнөх үетэй харьцуулалт
+              <FormulaTip text={`Сонгосон сарын дүнг өмнөх сартай харьцуулна.\nӨөрчлөлт % = (сонгосон − өмнөх) ÷ өмнөх × 100.\n${curPoint.label} ↔ ${prevPoint.label}`} />
+            </h3>
+            <div className="flex items-center gap-1.5">
+              <label htmlFor="pop-period" className="text-xs text-slate-400">Сар:</label>
+              <select
+                id="pop-period"
+                value={selectedKey}
+                onChange={(e) => setSelectedKey(e.target.value)}
+                className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-700 focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/15"
+              >
+                {comparable.map((p) => (
+                  <option key={p.key} value={p.key}>{p.label}</option>
+                ))}
+              </select>
+            </div>
           </div>
+          <p className="mb-3 text-xs text-slate-400">
+            {curPoint.label} · өмнө нь {prevPoint.label}
+          </p>
           <div className="grid grid-cols-3 gap-3">
             <div>
               <p className="text-xs text-slate-500">Орлого</p>
-              <p className="mt-0.5 text-base font-semibold tabular-nums text-emerald-600">{fmt(periodOverPeriod.current.inflow)}</p>
-              <TrendBadge pct={periodOverPeriod.inflowPct} goodWhenUp />
+              <p className="mt-0.5 text-base font-semibold tabular-nums text-emerald-600">{fmt(curPoint.inflow)}</p>
+              <TrendBadge pct={pctChange(curPoint.inflow, prevPoint.inflow)} goodWhenUp />
             </div>
             <div>
               <p className="text-xs text-slate-500">Зарлага</p>
-              <p className="mt-0.5 text-base font-semibold tabular-nums text-rose-600">{fmt(periodOverPeriod.current.outflow)}</p>
-              <TrendBadge pct={periodOverPeriod.outflowPct} goodWhenUp={false} />
+              <p className="mt-0.5 text-base font-semibold tabular-nums text-rose-600">{fmt(curPoint.outflow)}</p>
+              <TrendBadge pct={pctChange(curPoint.outflow, prevPoint.outflow)} goodWhenUp={false} />
             </div>
             <div>
               <p className="text-xs text-slate-500">Цэвэр урсгал</p>
-              <p className={`mt-0.5 text-base font-semibold tabular-nums ${periodOverPeriod.current.net >= 0 ? "text-slate-800" : "text-rose-600"}`}>
-                {fmtSigned(periodOverPeriod.current.net)}
+              <p className={`mt-0.5 text-base font-semibold tabular-nums ${curPoint.net >= 0 ? "text-slate-800" : "text-rose-600"}`}>
+                {fmtSigned(curPoint.net)}
               </p>
-              <TrendBadge pct={periodOverPeriod.netPct} goodWhenUp />
+              <TrendBadge pct={pctChange(curPoint.net, prevPoint.net)} goodWhenUp />
             </div>
           </div>
         </div>

@@ -5,7 +5,7 @@ import { useSession } from "next-auth/react";
 import {
   Pencil, Check, X, Trash2, TrendingUp, TrendingDown, Search, Filter, Landmark,
   ChevronDown, ChevronUp, RotateCcw, ArrowUp, ArrowDown,
-  CheckSquare, Square, Tag, Loader2,
+  CheckSquare, Square, Tag, Loader2, ChevronLeft, ChevronRight,
 } from "lucide-react";
 import { getCategoryStyle } from "@/lib/category-icons";
 import { resolveCustomCategoryIcon } from "@/lib/custom-category-icons";
@@ -55,6 +55,9 @@ function fmt(n: number) {
   return n.toLocaleString("mn-MN", { maximumFractionDigits: 0 }) + "₮";
 }
 
+/** Нэг хуудсанд харуулах гүйлгээний тоо. */
+const PAGE_SIZE = 50;
+
 export default function TransactionTable({ transactions, onUpdate, initialType = "all", defaultAdvancedOpen = false, lazy = false, onRequestLoad, loading = false }: Props) {
   const { data: session } = useSession();
   const userType: UserType = ((session?.user as { userType?: string | null } | undefined)?.userType === "business")
@@ -86,6 +89,9 @@ export default function TransactionTable({ transactions, onUpdate, initialType =
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [advancedOpen, setAdvancedOpen] = useState(defaultAdvancedOpen);
   const [showSyntaxHelp, setShowSyntaxHelp] = useState(false);
+
+  // Хуудаслалт
+  const [page, setPage] = useState(1);
 
   // Bulk selection
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -149,6 +155,15 @@ export default function TransactionTable({ transactions, onUpdate, initialType =
   const filtered = useMemo(
     () => applyAll(transactions, parsedQuery, extra, sortKey, sortDir),
     [transactions, parsedQuery, extra, sortKey, sortDir]
+  );
+
+  // Хуудаслалт: шүүлт/эрэмбэ өөрчлөгдөхөд 1-р хуудас руу буцаана
+  useEffect(() => { setPage(1); }, [filtered]);
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const currentPage = Math.min(page, totalPages);
+  const paged = useMemo(
+    () => filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE),
+    [filtered, currentPage]
   );
 
   // Шүүгдсэн нийт
@@ -239,7 +254,7 @@ export default function TransactionTable({ transactions, onUpdate, initialType =
   );
 
   // Bulk selection helpers
-  const visibleIds = useMemo(() => filtered.map(t => t.id), [filtered]);
+  const visibleIds = useMemo(() => paged.map(t => t.id), [paged]);
   const allVisibleSelected = visibleIds.length > 0 && visibleIds.every(id => selected.has(id));
   const someVisibleSelected = visibleIds.some(id => selected.has(id));
   const toggleRow = (id: string) => {
@@ -737,6 +752,7 @@ export default function TransactionTable({ transactions, onUpdate, initialType =
               : "Шүүлтэд тохирох гүйлгээ олдсонгүй"}
         </p>
       ) : (
+        <>
         <div className="overflow-x-auto rounded-xl border border-gray-200">
           <table className="w-full text-sm">
             <thead className="bg-gray-50 text-gray-600 text-xs uppercase">
@@ -768,7 +784,7 @@ export default function TransactionTable({ transactions, onUpdate, initialType =
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {filtered.map(t => {
+              {paged.map(t => {
                 const isSelected = selected.has(t.id);
                 return (
                 <tr
@@ -914,6 +930,48 @@ export default function TransactionTable({ transactions, onUpdate, initialType =
             </tbody>
           </table>
         </div>
+        {totalPages > 1 && (
+          <div className="flex flex-wrap items-center justify-between gap-3 px-1 pt-1 text-xs text-slate-500">
+            <span>
+              <span className="font-semibold text-slate-700">
+                {(currentPage - 1) * PAGE_SIZE + 1}–{Math.min(currentPage * PAGE_SIZE, filtered.length)}
+              </span>{" "}
+              / {filtered.length} гүйлгээ
+            </span>
+            <div className="inline-flex items-center gap-1">
+              <button
+                onClick={() => setPage(1)}
+                disabled={currentPage === 1}
+                className="rounded-md border border-slate-200 bg-white px-2 py-1 font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                « Эхэнд
+              </button>
+              <button
+                onClick={() => setPage(p => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+                className="inline-flex items-center gap-0.5 rounded-md border border-slate-200 bg-white px-2 py-1 font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                <ChevronLeft className="h-3.5 w-3.5" /> Өмнөх
+              </button>
+              <span className="px-2 font-semibold text-slate-700">{currentPage} / {totalPages}</span>
+              <button
+                onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                disabled={currentPage === totalPages}
+                className="inline-flex items-center gap-0.5 rounded-md border border-slate-200 bg-white px-2 py-1 font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                Дараах <ChevronRight className="h-3.5 w-3.5" />
+              </button>
+              <button
+                onClick={() => setPage(totalPages)}
+                disabled={currentPage === totalPages}
+                className="rounded-md border border-slate-200 bg-white px-2 py-1 font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                Сүүлд »
+              </button>
+            </div>
+          </div>
+        )}
+        </>
       )}
     </div>
   );

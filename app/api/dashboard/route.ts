@@ -130,6 +130,15 @@ export async function GET() {
       (a, b) => b.date.getTime() - a.date.getTime()
     );
     const monthLabel = (d: Date) => `${d.getUTCFullYear()} оны ${d.getUTCMonth() + 1}-р сар`;
+    const monthKey = (d: Date) => `${d.getUTCFullYear()}-${d.getUTCMonth() + 1}`;
+    // Бүх сарын цуваа (буурахаар) — клиент талд сар сонгож харьцуулалт хийхэд.
+    const periodSeries = sortedMonths.map((m) => ({
+      key: monthKey(m.date),
+      label: monthLabel(m.date),
+      inflow: m.income,
+      outflow: m.expense,
+      net: m.income - m.expense,
+    }));
     let periodOverPeriod: {
       current: { label: string; inflow: number; outflow: number; net: number };
       previous: { label: string; inflow: number; outflow: number; net: number };
@@ -167,6 +176,7 @@ export async function GET() {
       },
       perAccount,
       periodOverPeriod,
+      periodSeries,
     });
   } catch (err) {
     if (err instanceof UnauthorizedError) {
