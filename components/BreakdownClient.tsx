@@ -56,9 +56,11 @@ export default function BreakdownClient({ initialType = "all", initialMetric = n
       // availableYears нь шүүлтээс үл хамаарч бүх жилийг буцаадаг
       setYears(reports.availableYears ?? []);
       setUncategorizedCount(reports.uncategorizedCount ?? 0);
-      // Гүйлгээний бүтэн жагсаалтыг зөвхөн "Гүйлгээ" горимд, тодорхой жил сонгосон үед татна.
+      // Гүйлгээний бүтэн жагсаалтыг зөвхөн "Гүйлгээ" горимд татна.
       // (Үзүүлэлтийн задаргаа горим өөрийн хөнгөн нэгтгэл + lazy татацтай тул энд татах шаардлагагүй.)
-      if (metric !== null || year === "all") {
+      // "Бүгд" жил сонгосон үед суффикс хоосон тул бүх жилийн гүйлгээ татагдана —
+      // ингэснээр хүснэгт болон шүүлтийн хэрэгслүүд харагдана.
+      if (metric !== null) {
         setTransactions([]);
       } else {
         const txs = await fetch(`/api/transactions${suffix}`).then(r => r.json());
@@ -190,13 +192,6 @@ export default function BreakdownClient({ initialType = "all", initialMetric = n
         {metric !== null ? (
           // Харьцагчийн задаргаа — харьцагч дээр дарж гүйлгээг lazy үзнэ
           <CounterpartyDrilldown metric={metric} year={scopedYear} month={scopedMonth} />
-        ) : year === "all" ? (
-          <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-10 text-center">
-            <p className="text-sm font-medium text-slate-500">Гүйлгээг харахын тулд жил сонгоно уу</p>
-            <p className="mt-1 text-xs text-slate-400">
-              Дээрх «Жил» хэсгээс тодорхой жил (шаардлагатай бол сар) сонгоход гүйлгээ энд харагдана
-            </p>
-          </div>
         ) : loading ? (
           <div className="flex items-center justify-center py-20 text-slate-400">
             <Loader2 className="h-6 w-6 animate-spin" />

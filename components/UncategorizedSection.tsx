@@ -44,6 +44,8 @@ export default function UncategorizedSection({ statementId, count, onUpdate, yea
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [bulkCategory, setBulkCategory] = useState<string>("");
   const [saving, setSaving] = useState(false);
+  // Нэг гүйлгээ хадгалж буй мөрийн id — тухайн мөрөнд spinner харуулна
+  const [savingId, setSavingId] = useState<string | null>(null);
 
   const fetchUncategorized = useCallback(async () => {
     setLoading(true);
@@ -81,6 +83,7 @@ export default function UncategorizedSection({ statementId, count, onUpdate, yea
 
   const updateSingle = async (id: string, category: string) => {
     setSaving(true);
+    setSavingId(id);
     try {
       await fetch("/api/transactions", {
         method: "PATCH",
@@ -91,6 +94,7 @@ export default function UncategorizedSection({ statementId, count, onUpdate, yea
       onUpdate();
     } finally {
       setSaving(false);
+      setSavingId(null);
     }
   };
 
@@ -215,26 +219,34 @@ export default function UncategorizedSection({ statementId, count, onUpdate, yea
                           </span>
                         </p>
                       </div>
-                      <select
-                        defaultValue=""
-                        onChange={e => e.target.value && updateSingle(t.id, e.target.value)}
-                        disabled={saving}
-                        className="border rounded px-2 py-1 text-xs w-48"
-                      >
-                        <option value="" disabled>Категори сонгох...</option>
-                        {groups.map(g => (
-                          <optgroup key={g.id} label={g.name}>
-                            {g.items.map(i => <option key={i.id} value={i.name}>{i.name}</option>)}
-                          </optgroup>
-                        ))}
-                        {(t.type === "income" ? customIncome : customExpense).length > 0 && (
-                          <optgroup label="Миний ангилал">
-                            {(t.type === "income" ? customIncome : customExpense).map(c => (
-                              <option key={c.id} value={c.name}>{c.name}</option>
-                            ))}
-                          </optgroup>
+                      <div className="flex items-center gap-2">
+                        {savingId === t.id && (
+                          <span className="flex items-center gap-1 text-xs text-amber-600 whitespace-nowrap">
+                            <Loader2 className="w-3 h-3 animate-spin" />
+                            Хадгалж байна...
+                          </span>
                         )}
-                      </select>
+                        <select
+                          defaultValue=""
+                          onChange={e => e.target.value && updateSingle(t.id, e.target.value)}
+                          disabled={saving}
+                          className="border rounded px-2 py-1 text-xs w-48"
+                        >
+                          <option value="" disabled>Категори сонгох...</option>
+                          {groups.map(g => (
+                            <optgroup key={g.id} label={g.name}>
+                              {g.items.map(i => <option key={i.id} value={i.name}>{i.name}</option>)}
+                            </optgroup>
+                          ))}
+                          {(t.type === "income" ? customIncome : customExpense).length > 0 && (
+                            <optgroup label="Миний ангилал">
+                              {(t.type === "income" ? customIncome : customExpense).map(c => (
+                                <option key={c.id} value={c.name}>{c.name}</option>
+                              ))}
+                            </optgroup>
+                          )}
+                        </select>
+                      </div>
                     </div>
                   );
                 })}
