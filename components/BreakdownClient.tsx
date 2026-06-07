@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Loader2 } from "lucide-react";
 import AppShell from "@/components/AppShell";
 import UncategorizedSection from "@/components/UncategorizedSection";
 import TransactionTable from "@/components/TransactionTable";
@@ -41,6 +40,9 @@ export default function BreakdownClient({ initialType = "all", initialMetric = n
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [uncategorizedCount, setUncategorizedCount] = useState(0);
   const [loading, setLoading] = useState(true);
+  // "Бүгд" жилийн lazy ачаалалт — хэрэглэгч шүүлт хийж эхлэхэд л бүх жилийн
+  // гүйлгээг татна (анхдагчаар татахгүй, ингэснээр хуудас хурдан нээгдэнэ).
+  const [loadAll, setLoadAll] = useState(false);
 
   const fetchData = useCallback(async (opts?: { background?: boolean }) => {
     // background=true (дата шинэчлэгдсэн event) — байгаа агуулгыг spinner-ээр
@@ -56,20 +58,21 @@ export default function BreakdownClient({ initialType = "all", initialMetric = n
       // availableYears нь шүүлтээс үл хамаарч бүх жилийг буцаадаг
       setYears(reports.availableYears ?? []);
       setUncategorizedCount(reports.uncategorizedCount ?? 0);
-      // Гүйлгээний бүтэн жагсаалтыг зөвхөн "Гүйлгээ" горимд татна.
+      // Гүйлгээний жагсаалтыг зөвхөн "Гүйлгээ" горимд татна.
       // (Үзүүлэлтийн задаргаа горим өөрийн хөнгөн нэгтгэл + lazy татацтай тул энд татах шаардлагагүй.)
-      // "Бүгд" жил сонгосон үед суффикс хоосон тул бүх жилийн гүйлгээ татагдана —
-      // ингэснээр хүснэгт болон шүүлтийн хэрэгслүүд харагдана.
-      if (metric !== null) {
-        setTransactions([]);
-      } else {
+      // "Бүгд" жил сонгосон үед автоматаар БҮХ жилийн гүйлгээг татахгүй (хүнд) —
+      // хэрэглэгч шүүлт хийж эхлэхэд (loadAll=true болоход) л суффиксгүйгээр бүгдийг татна.
+      const shouldFetchTx = metric === null && (year !== "all" || loadAll);
+      if (shouldFetchTx) {
         const txs = await fetch(`/api/transactions${suffix}`).then(r => r.json());
         setTransactions(txs.transactions ?? []);
+      } else {
+        setTransactions([]);
       }
     } finally {
       if (!opts?.background) setLoading(false);
     }
-  }, [year, month, metric]);
+  }, [year, month, metric, loadAll]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
   const refresh = useCallback(() => fetchData({ background: true }), [fetchData]);
@@ -78,7 +81,11 @@ export default function BreakdownClient({ initialType = "all", initialMetric = n
   const selectYear = (y: number | "all") => {
     setYear(y);
     setMonth("all"); // жил солих үед сарын шүүлтийг буцаана
+    setLoadAll(false); // шинэ хүрээнд "Бүгд" бол дахин lazy эхэлнэ
   };
+
+  // TransactionTable дотор шүүлт идэвхжихэд (lazy "Бүгд" горимд) бүх гүйлгээг татуулна.
+  const requestLoadAll = useCallback(() => setLoadAll(true), []);
 
   const scopedYear = year !== "all" ? year : undefined;
   const scopedMonth = year !== "all" && month !== "all" ? month : undefined;
@@ -192,16 +199,17 @@ export default function BreakdownClient({ initialType = "all", initialMetric = n
         {metric !== null ? (
           // Харьцагчийн задаргаа — харьцагч дээр дарж гүйлгээг lazy үзнэ
           <CounterpartyDrilldown metric={metric} year={scopedYear} month={scopedMonth} />
-        ) : loading ? (
-          <div className="flex items-center justify-center py-20 text-slate-400">
-            <Loader2 className="h-6 w-6 animate-spin" />
-          </div>
         ) : (
+          // "Гүйлгээ" горим — хүснэгтийг үргэлж mount байлгана (шүүлтийн төлөв
+          // хадгалагдах ёстой). "Бүгд" жилийн үед lazy: шүүлт хийж эхлэхэд татна.
           <TransactionTable
             transactions={transactions}
             onUpdate={emitDataChanged}
             initialType={initialType}
             defaultAdvancedOpen
+            loading={loading}
+            lazy={year === "all" && !loadAll}
+            onRequestLoad={requestLoadAll}
           />
         )}
       </section>

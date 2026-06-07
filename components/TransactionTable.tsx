@@ -39,13 +39,23 @@ interface Props {
   initialType?: TypeFilter;
   /** Дэвшилтэт шүүлтийн самбарыг анхдагчаар нээлттэй харуулах (задаргааны хуудас). */
   defaultAdvancedOpen?: boolean;
+  /**
+   * Lazy горим ("Бүгд" жил): гүйлгээ хараахан ачаалаагүй. Шүүлтийн хэрэгслүүд
+   * харагдах боловч жагсаалт хоосон; хэрэглэгч шүүлт хийж эхлэхэд `onRequestLoad`
+   * дуудагдаж бүх гүйлгээ ачаална.
+   */
+  lazy?: boolean;
+  /** Lazy үед хэрэглэгч шүүлт хийж эхлэхэд гүйлгээг ачаалуулах callback. */
+  onRequestLoad?: () => void;
+  /** Гүйлгээ ачаалж буй эсэх — хүснэгтийн биед spinner харуулна. */
+  loading?: boolean;
 }
 
 function fmt(n: number) {
   return n.toLocaleString("mn-MN", { maximumFractionDigits: 0 }) + "₮";
 }
 
-export default function TransactionTable({ transactions, onUpdate, initialType = "all", defaultAdvancedOpen = false }: Props) {
+export default function TransactionTable({ transactions, onUpdate, initialType = "all", defaultAdvancedOpen = false, lazy = false, onRequestLoad, loading = false }: Props) {
   const { data: session } = useSession();
   const userType: UserType = ((session?.user as { userType?: string | null } | undefined)?.userType === "business")
     ? "business"
@@ -158,6 +168,12 @@ export default function TransactionTable({ transactions, onUpdate, initialType =
     categorySet.size > 0 ||
     !!dateFrom || !!dateTo ||
     !!amountMinStr || !!amountMaxStr;
+
+  // Lazy ("Бүгд") горим: хэрэглэгч ямар нэг шүүлт хийж эхэлмэгц бүх гүйлгээг
+  // ачаалуулна. Шүүлт идэвхжмэгц parent loadAll=true болгож, lazy унтарна.
+  useEffect(() => {
+    if (lazy && hasAnyFilter) onRequestLoad?.();
+  }, [lazy, hasAnyFilter, onRequestLoad]);
 
   const resetAll = () => {
     setSearch("");
@@ -603,7 +619,11 @@ export default function TransactionTable({ transactions, onUpdate, initialType =
       {/* Status row */}
       <div className="flex flex-wrap items-center justify-between gap-2 text-xs px-1">
         <div className="text-slate-500">
-          <span className="font-semibold text-slate-700">{filtered.length}</span> / {transactions.length} гүйлгээ
+          {lazy && !hasAnyFilter ? (
+            <span className="text-slate-400">Шүүлт хийж эхэлснээр гүйлгээ ачаална</span>
+          ) : (
+            <><span className="font-semibold text-slate-700">{filtered.length}</span> / {transactions.length} гүйлгээ</>
+          )}
         </div>
         {filtered.length > 0 && (
           <div className="flex items-center gap-3 font-medium">
@@ -704,9 +724,17 @@ export default function TransactionTable({ transactions, onUpdate, initialType =
       )}
 
       {/* Table */}
-      {filtered.length === 0 ? (
+      {loading ? (
+        <div className="flex items-center justify-center py-16 text-slate-400">
+          <Loader2 className="h-6 w-6 animate-spin" />
+        </div>
+      ) : filtered.length === 0 ? (
         <p className="text-center text-gray-400 py-10">
-          {transactions.length === 0 ? "Гүйлгээ байхгүй байна" : "Шүүлтэд тохирох гүйлгээ олдсонгүй"}
+          {lazy && !hasAnyFilter
+            ? "Шүүлт хийж эхэлснээр гүйлгээ энд ачаалагдана"
+            : transactions.length === 0
+              ? "Гүйлгээ байхгүй байна"
+              : "Шүүлтэд тохирох гүйлгээ олдсонгүй"}
         </p>
       ) : (
         <div className="overflow-x-auto rounded-xl border border-gray-200">
