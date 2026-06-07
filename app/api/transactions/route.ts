@@ -24,6 +24,7 @@ export async function GET(req: NextRequest) {
     const statementId = searchParams.get("statementId");
     const uncategorized = searchParams.get("uncategorized") === "true";
     const counterparty = searchParams.get("counterparty");
+    const category = searchParams.get("category");
     const typeParam = searchParams.get("type");
     const yearParam = searchParams.get("year");
     const year = yearParam ? Number(yearParam) : null;
@@ -36,6 +37,7 @@ export async function GET(req: NextRequest) {
     };
     if (statementId) where.statementId = statementId;
     if (uncategorized) where.category = { in: UNCATEGORIZED };
+    else if (category) where.category = category;
     if (counterparty) where.counterparty = counterparty;
     if (typeParam === "income" || typeParam === "expense") where.type = typeParam;
     if (year && !isNaN(year) && month && !isNaN(month) && month >= 1 && month <= 12) {

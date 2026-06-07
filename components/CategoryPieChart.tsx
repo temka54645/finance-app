@@ -1,7 +1,8 @@
 "use client";
 
-import { createElement, useMemo, useState } from "react";
+import { createElement, useEffect, useMemo, useState } from "react";
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from "recharts";
+import { X, Loader2, ArrowUpRight, ArrowDownRight } from "lucide-react";
 import { getCategoryColor, getCategoryStyle } from "@/lib/category-icons";
 import { getIncomeCategoryNames, getExpenseCategoryNames } from "@/lib/categories";
 import { useCustomCategories } from "@/lib/use-custom-categories";
@@ -14,12 +15,30 @@ interface CategoryItem {
   _count: number;
 }
 
+/** Modal-д харуулах гүйлгээний хөнгөн хувилбар. */
+export interface CategoryTransaction {
+  id: string;
+  date: string;
+  description: string;
+  counterparty?: string | null;
+  amount: number;
+  type: string;
+  category: string;
+  statement?: { fileName: string; bankName?: string | null } | null;
+}
+
 interface Props {
   byCategory: CategoryItem[];
   type: "income" | "expense";
   title: string;
   /** Гадна карт (border/bg)-гүйгээр шигтгэн харуулна. */
   bare?: boolean;
+  /**
+   * Сегмент/мөр дээр дарахад тухайн ангилалд бүртгэгдсэн гүйлгээнүүдийг
+   * ачаалах callback. Өгвөл график дээр дарах боломжтой болж, гүйлгээний
+   * жагсаалтыг modal-аар харуулна.
+   */
+  loadCategoryTransactions?: (category: string, type: "income" | "expense") => Promise<CategoryTransaction[]>;
 }
 
 interface PieDatum {
@@ -45,9 +64,13 @@ export default function CategoryPieChart({
   type,
   title,
   bare = false,
+  loadCategoryTransactions,
 }: Props) {
   // Hover хийсэн сегментийг pie болон legend хоёрын аль алинаас тодруулна.
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
+  // Дарж сонгосон ангилал — гүйлгээний жагсаалтыг modal-аар харуулна.
+  const [openCategory, setOpenCategory] = useState<{ name: string; value: number; count: number } | null>(null);
+  const clickable = !!loadCategoryTransactions;
 
   // Хэрэглэгчийн өөрийн ангиллын нэр → сонгосон icon key (custom категорийн лого харуулна).
   // userType-аар бус нэрээр нь тааруулна — өөр дэлгэцэд (userType дамжуулаагүй) ч ажиллана.
@@ -134,10 +157,14 @@ export default function CategoryPieChart({
         </span>
       </div>
 
-      {/* Pie + Legend хажуулж */}
-      <div className="flex gap-3 min-h-0">
+      {clickable && (
+        <p className="-mt-1 text-[11px] text-slate-400">Ангилал дээр дарж гүйлгээг нь харна уу</p>
+      )}
+
+      {/* Pie + Legend хажуулж — томруулсан, жижиг дэлгэцэд босоо овоолно */}
+      <div className="flex flex-col items-center gap-3 min-h-0 sm:flex-row sm:items-stretch sm:gap-4">
         {/* Pie chart */}
-        <div className="w-36 h-36 flex-shrink-0">
+        <div className="h-52 w-52 flex-shrink-0">
           <ResponsiveContainer width="100%" height="100%">
             <PieChart>
               <Pie
@@ -146,13 +173,17 @@ export default function CategoryPieChart({
                 nameKey="name"
                 cx="50%"
                 cy="50%"
-                outerRadius={64}
-                innerRadius={30}
+                outerRadius={96}
+                innerRadius={48}
                 paddingAngle={2}
                 strokeWidth={0}
                 isAnimationActive={false}
                 onMouseEnter={(_, i) => setActiveIndex(i)}
                 onMouseLeave={() => setActiveIndex(null)}
+                onClick={(_, i) => {
+                  if (clickable && data[i]) setOpenCategory({ name: data[i].name, value: data[i].value, count: data[i].count });
+                }}
+                className={clickable ? "cursor-pointer" : undefined}
               >
                 {data.map((entry, i) => (
                   <Cell
@@ -172,7 +203,7 @@ export default function CategoryPieChart({
         </div>
 
         {/* Custom legend — scroll-тэй, overflow хийхгүй */}
-        <div className="flex-1 min-w-0 overflow-y-auto max-h-36 space-y-0.5 pr-1">
+        <div className="w-full flex-1 min-w-0 overflow-y-auto max-h-52 space-y-0.5 pr-1">
           {data.map((entry, i) => {
             const pct = total > 0 ? ((entry.value / total) * 100).toFixed(1) : "0";
             const active = activeIndex === i;
@@ -180,12 +211,16 @@ export default function CategoryPieChart({
             return (
               <div
                 key={i}
-                className={`flex items-center gap-1.5 min-w-0 rounded px-1 py-0.5 transition-colors cursor-default ${
-                  active ? "bg-slate-100" : ""
-                }`}
+                role={clickable ? "button" : undefined}
+                tabIndex={clickable ? 0 : undefined}
+                className={`flex items-center gap-1.5 min-w-0 rounded px-1 py-1 transition-colors ${
+                  clickable ? "cursor-pointer hover:bg-slate-100" : "cursor-default"
+                } ${active ? "bg-slate-100" : ""}`}
                 onMouseEnter={() => setActiveIndex(i)}
                 onMouseLeave={() => setActiveIndex(null)}
-                title={`${entry.name} · ${fmt(entry.value)} · ${pct}% · ${entry.count} гүйлгээ`}
+                onClick={() => { if (clickable) setOpenCategory({ name: entry.name, value: entry.value, count: entry.count }); }}
+                onKeyDown={(e) => { if (clickable && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); setOpenCategory({ name: entry.name, value: entry.value, count: entry.count }); } }}
+                title={`${entry.name} · ${fmt(entry.value)} · ${pct}% · ${entry.count} гүйлгээ${clickable ? " — дарж харна уу" : ""}`}
               >
                 {/* Өнгийн дөрвөлж */}
                 <span
@@ -215,6 +250,122 @@ export default function CategoryPieChart({
               </div>
             );
           })}
+        </div>
+      </div>
+
+      {openCategory && loadCategoryTransactions && (
+        <CategoryTxModal
+          category={openCategory.name}
+          total={openCategory.value}
+          count={openCategory.count}
+          type={type}
+          load={loadCategoryTransactions}
+          customIconByName={customIconByName}
+          onClose={() => setOpenCategory(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+// Тухайн ангилалд бүртгэгдсэн гүйлгээнүүдийг жагсаан харуулах modal.
+function CategoryTxModal({
+  category, total, count, type, load, customIconByName, onClose,
+}: {
+  category: string;
+  total: number;
+  count: number;
+  type: "income" | "expense";
+  load: (category: string, type: "income" | "expense") => Promise<CategoryTransaction[]>;
+  customIconByName: Map<string, string | null | undefined>;
+  onClose: () => void;
+}) {
+  const [txs, setTxs] = useState<CategoryTransaction[] | null>(null);
+  const [error, setError] = useState(false);
+
+  useEffect(() => {
+    let alive = true;
+    setTxs(null);
+    setError(false);
+    load(category, type)
+      .then((rows) => { if (alive) setTxs(rows); })
+      .catch(() => { if (alive) setError(true); });
+    return () => { alive = false; };
+  }, [category, type, load]);
+
+  // Esc дарвал хаах
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  const color = getCategoryColor(category);
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-end justify-center bg-slate-900/40 p-0 sm:items-center sm:p-4"
+      onClick={onClose}
+    >
+      <div
+        className="flex max-h-[85vh] w-full max-w-lg flex-col overflow-hidden rounded-t-2xl bg-white shadow-2xl sm:rounded-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="flex items-start justify-between gap-3 border-b border-slate-100 p-4">
+          <div className="flex items-center gap-2 min-w-0">
+            <CatIcon name={category} customIconByName={customIconByName} className="h-5 w-5 flex-shrink-0" />
+            <div className="min-w-0">
+              <h3 className="truncate text-sm font-semibold text-slate-800" style={{ color }}>{category}</h3>
+              <p className="text-xs text-slate-500 tabular-nums">{fmt(total)} · {count} гүйлгээ</p>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            aria-label="Хаах"
+            className="flex-shrink-0 rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className="flex-1 overflow-y-auto p-2">
+          {error ? (
+            <p className="py-10 text-center text-sm text-rose-500">Гүйлгээг ачаалахад алдаа гарлаа</p>
+          ) : txs === null ? (
+            <div className="flex items-center justify-center py-12 text-slate-400">
+              <Loader2 className="h-6 w-6 animate-spin" />
+            </div>
+          ) : txs.length === 0 ? (
+            <p className="py-10 text-center text-sm text-slate-400">Гүйлгээ олдсонгүй</p>
+          ) : (
+            <ul className="divide-y divide-slate-100">
+              {txs.map((t) => (
+                <li key={t.id} className="flex items-center gap-2 px-2 py-2.5">
+                  <span className={`flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full ${
+                    t.type === "income" ? "bg-emerald-100 text-emerald-600" : "bg-rose-100 text-rose-600"
+                  }`}>
+                    {t.type === "income" ? <ArrowUpRight className="h-3.5 w-3.5" /> : <ArrowDownRight className="h-3.5 w-3.5" />}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-xs font-medium text-slate-700" title={t.description}>
+                      {t.description || t.counterparty || "—"}
+                    </p>
+                    <p className="text-[11px] text-slate-400">
+                      {new Date(t.date).toLocaleDateString("mn-MN")}
+                      {t.statement?.bankName ? ` · ${t.statement.bankName}` : ""}
+                    </p>
+                  </div>
+                  <span className={`flex-shrink-0 text-xs font-semibold tabular-nums ${
+                    t.type === "income" ? "text-emerald-600" : "text-rose-600"
+                  }`}>
+                    {t.type === "income" ? "+" : "−"}{fmt(t.amount)}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
       </div>
     </div>

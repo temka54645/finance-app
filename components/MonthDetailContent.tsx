@@ -64,6 +64,14 @@ export default function MonthDetailContent({ year, month, onExternalChange }: Pr
     onExternalChange?.();
   };
 
+  // Pie сегмент дээр дарахад — гүйлгээ нь аль хэдийн ачаалагдсан тул
+  // санах ойгоос шүүж шууд харуулна.
+  const loadCategoryTransactions = useCallback(
+    async (category: string, t: "income" | "expense") =>
+      transactions.filter(tx => tx.category === category && tx.type === t),
+    [transactions]
+  );
+
   if (loading && !report) {
     return (
       <div className="flex items-center justify-center py-20 text-gray-400">
@@ -108,11 +116,13 @@ export default function MonthDetailContent({ year, month, onExternalChange }: Pr
               byCategory={report.byCategory}
               type="income"
               title="Орлогын ангилал"
+              loadCategoryTransactions={loadCategoryTransactions}
             />
             <CategoryPieChart
               byCategory={report.byCategory}
               type="expense"
               title="Зарлагын ангилал"
+              loadCategoryTransactions={loadCategoryTransactions}
             />
           </div>
         </>

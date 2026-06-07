@@ -117,6 +117,25 @@ export default function MonthlyBarChart({ readOnly = false, lowCoverage = false,
     }));
   }, [byCategory, selected]);
 
+  // Pie сегмент дээр дарахад тухайн ангилалд бүртгэгдсэн гүйлгээг (сонгосон
+  // жилүүдээр) серверээс татаж нэгтгэнэ.
+  const loadCategoryTransactions = useCallback(
+    async (category: string, type: "income" | "expense") => {
+      const yrs = Array.from(selected);
+      const results = await Promise.all(
+        yrs.map(y =>
+          fetch(`/api/transactions?category=${encodeURIComponent(category)}&type=${type}&year=${y}`)
+            .then(r => r.json())
+            .then(d => d.transactions ?? [])
+        )
+      );
+      return results
+        .flat()
+        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    },
+    [selected]
+  );
+
   if (!loading && years.length === 0) return null;
 
   return (
@@ -201,12 +220,14 @@ export default function MonthlyBarChart({ readOnly = false, lowCoverage = false,
             type="income"
             title="Орлогын ангилал"
             bare
+            loadCategoryTransactions={loadCategoryTransactions}
           />
           <CategoryPieChart
             byCategory={catItems}
             type="expense"
             title="Зарлагын ангилал"
             bare
+            loadCategoryTransactions={loadCategoryTransactions}
           />
         </div>
       )}
