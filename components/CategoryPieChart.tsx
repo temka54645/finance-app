@@ -3,10 +3,37 @@
 import { createElement, useEffect, useMemo, useState } from "react";
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from "recharts";
 import { X, Loader2, ArrowUpRight, ArrowDownRight } from "lucide-react";
-import { getCategoryColor, getCategoryStyle } from "@/lib/category-icons";
-import { getIncomeCategoryNames, getExpenseCategoryNames } from "@/lib/categories";
+import { getCategoryStyle } from "@/lib/category-icons";
 import { useCustomCategories } from "@/lib/use-custom-categories";
 import { resolveCustomCategoryIcon } from "@/lib/custom-category-icons";
+
+/**
+ * Тод, давтагдахгүй өнгөний багц — саарал өнгөгүй. Ангиллуудыг дүнгээр нь
+ * эрэмбэлсний дараа индексээр нь онооно. Ингэснээр зэргэлдээ сегментүүд
+ * болон legend-ийн мөрүүд харааны хувьд тод ялгарна.
+ */
+const CHART_PALETTE = [
+  "#2563eb", // blue
+  "#16a34a", // green
+  "#f59e0b", // amber
+  "#dc2626", // red
+  "#7c3aed", // violet
+  "#0891b2", // cyan
+  "#db2777", // pink
+  "#65a30d", // lime
+  "#ea580c", // orange
+  "#0d9488", // teal
+  "#4f46e5", // indigo
+  "#ca8a04", // yellow-600
+  "#be123c", // rose
+  "#9333ea", // purple
+  "#0284c7", // sky
+  "#15803d", // green-700
+  "#c026d3", // fuchsia
+  "#e11d48", // rose-600
+  "#059669", // emerald
+  "#d97706", // amber-600
+];
 
 interface CategoryItem {
   category: string;
@@ -69,7 +96,7 @@ export default function CategoryPieChart({
   // Hover хийсэн сегментийг pie болон legend хоёрын аль алинаас тодруулна.
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
   // Дарж сонгосон ангилал — гүйлгээний жагсаалтыг modal-аар харуулна.
-  const [openCategory, setOpenCategory] = useState<{ name: string; value: number; count: number } | null>(null);
+  const [openCategory, setOpenCategory] = useState<{ name: string; value: number; count: number; color: string } | null>(null);
   const clickable = !!loadCategoryTransactions;
 
   // Хэрэглэгчийн өөрийн ангиллын нэр → сонгосон icon key (custom категорийн лого харуулна).
@@ -83,52 +110,22 @@ export default function CategoryPieChart({
     return m;
   }, [type, customCategories]);
 
-  // Орлого/зарлагын ангиллын бүх боломжит нэр (personal + business хоёулангаас нь)
-  // Энэ нь userType солигдсон ч хуучин гүйлгээнүүдийг зөв шүүхэд хэрэгтэй.
-  const validNamesForThisType = useMemo(() => {
-    const incomeNames = new Set([
-      ...getIncomeCategoryNames("personal"),
-      ...getIncomeCategoryNames("business"),
-      "Бусад орлого",
-    ]);
-    const expenseNames = new Set([
-      ...getExpenseCategoryNames("personal"),
-      ...getExpenseCategoryNames("business"),
-      "Бусад зарлага",
-    ]);
-    return { incomeNames, expenseNames };
-  }, []);
-
+  // Pie зөвхөн бодит бүртгэгдсэн гүйлгээнээс үүснэ — гүйлгээ бүрийн өөрийнх нь
+  // `type` талбараар шүүнэ (ангиллын каталогийн нэрээр БУС). Ингэснээр жишээ нь
+  // "Хөрөнгө оруулалт" гэж зарлагаар бүртгэсэн гүйлгээ ч зарлагын pie-д харагдана.
+  // Дараа нь дүнгээр нь эрэмбэлж, индексээр давтагдахгүй өнгө онооно.
   const data = useMemo<PieDatum[]>(() =>
     byCategory
-      .filter(c => {
-        if ((c._sum.amount ?? 0) <= 0) return false;
-        const { incomeNames, expenseNames } = validNamesForThisType;
-        const isKnownIncome = incomeNames.has(c.category);
-        const isKnownExpense = expenseNames.has(c.category);
-
-        if (type === "income") {
-          // Орлогын chart: nameKey нь орлогын нэр байх ёстой
-          // Хэрвээ category нэр нь зарлагынх бол (өгөгдлийн зөрчил) — хасна
-          if (isKnownExpense && !isKnownIncome) return false;
-          // Тодорхой орлогын нэр — оруулна
-          if (isKnownIncome) return true;
-          // "Ангилаагүй" гэх мэт танигдаагүй нэр — type талбараар шалгана
-          return c.type === "income";
-        } else {
-          if (isKnownIncome && !isKnownExpense) return false;
-          if (isKnownExpense) return true;
-          return c.type === "expense";
-        }
-      })
+      .filter(c => c.type === type && (c._sum.amount ?? 0) > 0)
       .map(c => ({
         name: c.category,
         value: c._sum.amount ?? 0,
         count: c._count,
-        color: getCategoryColor(c.category),
+        color: "",
       }))
-      .sort((a, b) => b.value - a.value),
-  [byCategory, type, validNamesForThisType]);
+      .sort((a, b) => b.value - a.value)
+      .map((c, i) => ({ ...c, color: CHART_PALETTE[i % CHART_PALETTE.length] })),
+  [byCategory, type]);
 
   const total = useMemo(() => data.reduce((s, d) => s + d.value, 0), [data]);
 
@@ -181,7 +178,7 @@ export default function CategoryPieChart({
                 onMouseEnter={(_, i) => setActiveIndex(i)}
                 onMouseLeave={() => setActiveIndex(null)}
                 onClick={(_, i) => {
-                  if (clickable && data[i]) setOpenCategory({ name: data[i].name, value: data[i].value, count: data[i].count });
+                  if (clickable && data[i]) setOpenCategory({ name: data[i].name, value: data[i].value, count: data[i].count, color: data[i].color });
                 }}
                 className={clickable ? "cursor-pointer" : undefined}
               >
@@ -218,8 +215,8 @@ export default function CategoryPieChart({
                 } ${active ? "bg-slate-100" : ""}`}
                 onMouseEnter={() => setActiveIndex(i)}
                 onMouseLeave={() => setActiveIndex(null)}
-                onClick={() => { if (clickable) setOpenCategory({ name: entry.name, value: entry.value, count: entry.count }); }}
-                onKeyDown={(e) => { if (clickable && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); setOpenCategory({ name: entry.name, value: entry.value, count: entry.count }); } }}
+                onClick={() => { if (clickable) setOpenCategory({ name: entry.name, value: entry.value, count: entry.count, color: entry.color }); }}
+                onKeyDown={(e) => { if (clickable && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); setOpenCategory({ name: entry.name, value: entry.value, count: entry.count, color: entry.color }); } }}
                 title={`${entry.name} · ${fmt(entry.value)} · ${pct}% · ${entry.count} гүйлгээ${clickable ? " — дарж харна уу" : ""}`}
               >
                 {/* Өнгийн дөрвөлж */}
@@ -231,6 +228,7 @@ export default function CategoryPieChart({
                 {/* Icon — өнгөийг сегментийн өнгөтэй нийцүүлнэ */}
                 <CatIcon
                   name={entry.name}
+                  color={entry.color}
                   customIconByName={customIconByName}
                   className="flex-shrink-0 w-3.5 h-3.5"
                 />
@@ -258,6 +256,7 @@ export default function CategoryPieChart({
           category={openCategory.name}
           total={openCategory.value}
           count={openCategory.count}
+          color={openCategory.color}
           type={type}
           load={loadCategoryTransactions}
           customIconByName={customIconByName}
@@ -270,11 +269,12 @@ export default function CategoryPieChart({
 
 // Тухайн ангилалд бүртгэгдсэн гүйлгээнүүдийг жагсаан харуулах modal.
 function CategoryTxModal({
-  category, total, count, type, load, customIconByName, onClose,
+  category, total, count, color, type, load, customIconByName, onClose,
 }: {
   category: string;
   total: number;
   count: number;
+  color: string;
   type: "income" | "expense";
   load: (category: string, type: "income" | "expense") => Promise<CategoryTransaction[]>;
   customIconByName: Map<string, string | null | undefined>;
@@ -300,8 +300,6 @@ function CategoryTxModal({
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
 
-  const color = getCategoryColor(category);
-
   return (
     <div
       className="fixed inset-0 z-50 flex items-end justify-center bg-slate-900/40 p-0 sm:items-center sm:p-4"
@@ -314,7 +312,7 @@ function CategoryTxModal({
         {/* Header */}
         <div className="flex items-start justify-between gap-3 border-b border-slate-100 p-4">
           <div className="flex items-center gap-2 min-w-0">
-            <CatIcon name={category} customIconByName={customIconByName} className="h-5 w-5 flex-shrink-0" />
+            <CatIcon name={category} color={color} customIconByName={customIconByName} className="h-5 w-5 flex-shrink-0" />
             <div className="min-w-0">
               <h3 className="truncate text-sm font-semibold text-slate-800" style={{ color }}>{category}</h3>
               <p className="text-xs text-slate-500 tabular-nums">{fmt(total)} · {count} гүйлгээ</p>
@@ -377,17 +375,20 @@ function CategoryTxModal({
 // Дараалал: (1) хэрэглэгчийн custom лого → (2) нэгдсэн каталог → (3) fallback.
 function CatIcon({
   name,
+  color,
   customIconByName,
   className,
 }: {
   name: string;
+  /** Pie/legend-тэй ижил оноосон өнгө. */
+  color: string;
   customIconByName: Map<string, string | null | undefined>;
   className?: string;
 }) {
   const icon = customIconByName.has(name)
     ? resolveCustomCategoryIcon(customIconByName.get(name))
     : getCategoryStyle(name).icon;
-  return createElement(icon, { className, style: { color: getCategoryColor(name) } });
+  return createElement(icon, { className, style: { color } });
 }
 
 // Hover хийхэд аль ангилал, ямар дүн, хэдэн хувь, хэдэн гүйлгээ болохыг тодорхой харуулна.
@@ -405,7 +406,7 @@ function PieTooltip({ active, payload, total, customIconByName }: PieTooltipProp
   return (
     <div className="rounded-lg border border-slate-200 bg-white px-3 py-2 shadow-md">
       <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-700">
-        <CatIcon name={p.name} customIconByName={customIconByName} className="w-3.5 h-3.5" />
+        <CatIcon name={p.name} color={p.color} customIconByName={customIconByName} className="w-3.5 h-3.5" />
         <span>{p.name}</span>
       </div>
       <div className="mt-1 text-xs text-slate-600 tabular-nums">
