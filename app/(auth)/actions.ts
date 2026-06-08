@@ -98,6 +98,33 @@ export type LoginResult =
   | { ok: true }
   | { ok: false; error: string; code?: "EmailNotVerified" };
 
+/**
+ * NextAuth-ийн `authorize` дотроос шидсэн `Error("EmailNotVerified")`-ийг
+ * `CallbackRouteError`-оор боож, жинхэнэ message-ийг `err.cause.err`-д нууна.
+ * Зөвхөн `err.message`-ийг шалгахад илрэхгүй (тэр нь зөвхөн "Read more at ..."
+ * болдог) тул cause гинжийг бүхэлд нь гүйж шалгана.
+ */
+function errorChainIncludes(err: unknown, needle: string): boolean {
+  const seen = new Set<unknown>();
+  let cur: unknown = err;
+  while (cur && !seen.has(cur)) {
+    seen.add(cur);
+    if (typeof cur === "string" && cur.includes(needle)) return true;
+    if (cur instanceof Error && cur.message.includes(needle)) return true;
+    const cause = (cur as { cause?: unknown }).cause;
+    // CallbackRouteError-ийн анхны алдаа `cause.err`-д хадгалагдана
+    if (cause && typeof cause === "object" && "err" in cause) {
+      const inner = (cause as { err?: unknown }).err;
+      if (inner && inner !== cur) {
+        cur = inner;
+        continue;
+      }
+    }
+    cur = cause;
+  }
+  return false;
+}
+
 export async function loginAction(formData: FormData): Promise<LoginResult> {
   const email = String(formData.get("email") ?? "").toLowerCase();
   const password = String(formData.get("password") ?? "");
@@ -111,8 +138,7 @@ export async function loginAction(formData: FormData): Promise<LoginResult> {
     return { ok: true };
   } catch (err) {
     // NextAuth-аас гарсан "EmailNotVerified" алдааг тусгайлан таниулна
-    const message = err instanceof Error ? err.message : String(err);
-    if (message.includes("EmailNotVerified")) {
+    if (errorChainIncludes(err, "EmailNotVerified")) {
       return {
         ok: false,
         error: "Энэ имэйлийг баталгаажуулаагүй байна. Имэйлээ шалгана уу.",
