@@ -145,7 +145,47 @@ docker-compose.yml       # Local Postgres only
 
 ## Changelog
 
-Хамгийн сүүлийн томоохон шинэчлэлтүүд (огноогоор буурахаар жагсаасан).
+Хамгийн сүүлийн томоохон шинэчлэлтүүд (огноогоор буурахаар жагсаасан). Зөвхөн онцлох өөрчлөлтүүдийг үлдээв — жижиг засварууд тус тусдаа жагсаагаагүй.
+
+### 2026-06-17 — Хуулга давхардлаас сэргийлэх (duplicate import guard)
+
+- Нэг данс/хугацааг хамарсан **2 өөр файл** (жишээ нь TDB export + танигдаагүй форматын файл) оруулахад ижил гүйлгээ давхар ордог байсныг зассан. Том дүнтэй орлого/зарлага хоёр дахин тоологдох ноцтой алдааг арилгана.
+- Файл бүр өөр parser-аар уншигддаг тул `description` зөрдөг — иймд шинэ `lib/import-dedup.ts` нь **(огноо + төрөл + дүн)** түлхүүрээр multiset харьцуулалт хийж аль хэдийн орсон гүйлгээг алгасна (±1 өдрийн цонхтой).
+- Upload хариунд `skippedDuplicates` буцаана; UI дээр хэдэн гүйлгээ алгасагдсаныг харуулж, шаардвал **«Бүгдийг хүчээр оруулах»** (`forceImport=true`) товчоор override хийнэ.
+- Аюулгүй: нэг өдрийн 2 жинхэнэ ижил шимтгэлийг multiset логик устгахгүй.
+
+### 2026-06-08 — Auth: имэйл баталгаажаагүй алдааг зөв таних
+
+- Нэвтрэхэд `EmailNotVerified`-ийг `CallbackRouteError`-ийн cause гинжээр илрүүлж, хэрэглэгчид зөв мессеж харуулна.
+
+### 2026-06-07 — Хяналтын самбар & ангиллын pie chart
+
+- Ангиллын pie chart томорч, ангилал дээр дарахад тухайн ангиллын гүйлгээнүүд нээгддэг болов; бодит бүртгэлээс өгөгдөл авч, давтагдахгүй өнгөөр зурна.
+- Харьцуулах хугацааг сонгох боломж + breakdown pagination; net-flow болон карт бүрийн тооцооллын ⓘ tooltip нэмэв.
+- «Бүгд жил» үед гүйлгээг lazy ачаалж гүйцэтгэлийг сайжруулав.
+
+### 2026-06-02 — ХААН банкны хувь хүний PDF parser
+
+- `lib/parsers/banks/khan.ts`-д PDF хуулга задлах дэмжлэг нэмэв.
+
+### 2026-06-01 — Ангилал, икон, dashboard үзүүлэлтүүд
+
+- Custom ангилалд AI-powered икон сонголт; икон зөв шийдэгддэг болов; «Бусад орлого/зарлага»-г жинхэнэ ангилал гэж тооцно.
+- Dashboard үзүүлэлтүүд: бэлэн мөнгөний үлдэгдэл, runway, coverage, данс тус бүрийн metrics; Section C-г metrics заавар болгов.
+- Drilldown/insights дээр ангилаагүй харьцагчдыг тэмдэглэнэ.
+
+### 2026-05-30/31 — Хяналтын самбарын бүтцийн шинэчлэл
+
+- Задаргааг (breakdown) тусдаа цэс + зүүн sidebar навигаци болгон салгав.
+- Сарын динамик interactive chart (олон жил сонгох) highlight картыг орлов.
+- Харьцагчийн (харьцсан данс) шинжилгээ: тусдаа багана болгож, generic + AI parser-уудаас задлав.
+- Upload-аас AI categorization-ийг хасч keyword + regex fallback-аар хурдасгав.
+- Personal/business горим, custom ангилал, account type-д түгжигдсэн каталог.
+- Deploy cache-bust засвар (GIT_SHA-аар commit бүрт source дахин build); admin/энгийн хэрэглэгчийн route хамгаалалтыг тусгаарлав.
+
+### 2026-05-27 — Statements bulk-delete (production)
+
+- `components/StatementsManager.tsx`-д multi-select checkbox + bulk-delete production-д идэвхтэй болов; `app/api/statements` DELETE handler `{ ids: string[] }`-г дэмжинэ (tenant scope-той). Хуулга устгахад түүний бүх гүйлгээ хамт устана.
 
 ### 2026-05-25 — Гүйлгээний дэвшилтэт шүүлт + olноор bulk update
 
@@ -165,18 +205,8 @@ docker-compose.yml       # Local Postgres only
 ### 2026-05-25 — Upload UX & performance
 
 - **Auto-redirect устгасан**: upload амжилттай дууссаны дараа автоматаар dashboard руу үсрэхгүй. Success banner-ийн "Дашбоард руу очих" товчоор хэрэглэгч зөвшөөрөл өгч хаана.
-- **Concurrency 3 → 2**: parallel upload-ийн event-loop saturation бууруулахаар. Сүүлийн файлуудын latency spike арилсан.
-- **Gap-warning false positive засвар**: Өмнө нь parallel upload-ийн дараа "anhaaruulga" буруу гарч байсан (бүх concurrent upload ижил "өмнөх" statement-ийг олж байсан). Шинэ `app/api/statements/gaps` endpoint бүх statement-ийг периодын дарааллаар sequential walk хийж зөв gap-уудыг буцаана. Client upload бүхэн дууссаны дараа нэг удаа дуудна.
-
-### 2026-05-27 — Statements bulk-delete (production)
-
-- `components/StatementsManager.tsx`-д multi-select checkbox + bulk-delete action bar production-д идэвхтэй болов (`TEST_MODE` gate-ийг арилгасан).
-- `app/api/statements` DELETE handler `{ ids: string[] }` body-г дэмждэг (single `id` ч хэвээр ажиллана), tenant scope `statement.userId`-аар хамгаалсан.
-- Хуулга устгахад түүний бүх гүйлгээ ч хамт устана.
-
-### 2026-05-25 — Upload performance
-
-- Parallel upload, parallel AI batches, `createMany` ашиглалт, server timing diagnostics.
+- **Гүйцэтгэл**: parallel upload, parallel AI batches, `createMany`, server timing diagnostics; concurrency 3 → 2 болгож event-loop saturation бууруулав.
+- **Gap-warning false positive засвар**: Шинэ `app/api/statements/gaps` endpoint бүх statement-ийг периодын дарааллаар sequential walk хийж зөв gap-уудыг буцаана. Client upload бүхэн дууссаны дараа нэг удаа дуудна.
 
 ### 2026-05-25 — Golomt банкны parser
 

@@ -32,6 +32,7 @@ interface QueueItem {
   status: ItemStatus;
   message?: string;
   count?: number;
+  skippedDuplicates?: number;
   detectedBank?: string | null;
   gapWarning?: string | null;
   clientMs?: number;
@@ -97,6 +98,7 @@ export default function FileUpload({ onSuccess, onRequestClose, compact = false 
               let data: {
                 error?: string;
                 count?: number;
+                skippedDuplicates?: number;
                 detectedBank?: string | null;
                 code?: string;
                 upgradeUrl?: string;
@@ -136,6 +138,7 @@ export default function FileUpload({ onSuccess, onRequestClose, compact = false 
                         ...q,
                         status: "done",
                         count: data.count ?? 0,
+                        skippedDuplicates: data.skippedDuplicates ?? 0,
                         detectedBank: data.detectedBank ?? null,
                         // gapWarning эхэндээ null. Бүх upload дууссаны дараа
                         // /api/statements/gaps-аас merge хийгдэнэ.
@@ -198,6 +201,52 @@ export default function FileUpload({ onSuccess, onRequestClose, compact = false 
           // Dashboard-ыг refetch хийнэ
           onSuccess();
         }
+      }
+    },
+    [bankName, onSuccess]
+  );
+
+  // Давхардсан гэж алгасагдсан файлыг forceImport=true-р дахин оруулна.
+  const forceReupload = useCallback(
+    async (item: QueueItem) => {
+      setQueue(prev =>
+        prev.map(q => (q.id === item.id ? { ...q, status: "uploading" } : q))
+      );
+      const formData = new FormData();
+      formData.append("file", item.file);
+      if (bankName) formData.append("bankName", bankName);
+      formData.append("forceImport", "true");
+      try {
+        const res = await fetch("/api/upload", { method: "POST", body: formData });
+        const text = await res.text();
+        const data = (text ? JSON.parse(text) : {}) as {
+          error?: string; count?: number; detectedBank?: string | null;
+          statement?: { id?: string };
+        };
+        if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`);
+        setQueue(prev =>
+          prev.map(q =>
+            q.id === item.id
+              ? {
+                  ...q,
+                  status: "done",
+                  count: data.count ?? 0,
+                  skippedDuplicates: 0,
+                  detectedBank: data.detectedBank ?? null,
+                  statementId: data.statement?.id,
+                }
+              : q
+          )
+        );
+        onSuccess();
+      } catch (err) {
+        setQueue(prev =>
+          prev.map(q =>
+            q.id === item.id
+              ? { ...q, status: "error", message: err instanceof Error ? err.message : "Алдаа" }
+              : q
+          )
+        );
       }
     },
     [bankName, onSuccess]
@@ -366,6 +415,9 @@ export default function FileUpload({ onSuccess, onRequestClose, compact = false 
                           {" · "}
                           <span className="text-emerald-700 font-medium">{item.count} гүйлгээ</span>
                           {item.detectedBank && <> · <span className="text-slate-600">{item.detectedBank}</span></>}
+                          {item.skippedDuplicates ? (
+                            <> · <span className="text-amber-700 font-medium">{item.skippedDuplicates} давхардсан (алгассан)</span></>
+                          ) : null}
                         </>
                       )}
                       {item.status === "uploading" && " · Боловсруулж байна..."}
@@ -376,6 +428,20 @@ export default function FileUpload({ onSuccess, onRequestClose, compact = false 
                     </p>
                   </div>
                 </div>
+                {item.status === "done" && (item.skippedDuplicates ?? 0) > 0 && (
+                  <div className="mt-1.5 flex items-center justify-between gap-2 rounded-md border border-amber-200 bg-amber-100/60 px-2 py-1.5 text-[11px] leading-snug text-amber-900">
+                    <span className="break-words">
+                      {item.skippedDuplicates} гүйлгээ аль хэдийн орсон тул алгаслаа.
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => forceReupload(item)}
+                      className="flex-shrink-0 px-2 py-0.5 rounded-md bg-amber-600 hover:bg-amber-700 text-white text-[10px] font-semibold transition-colors"
+                    >
+                      Бүгдийг хүчээр оруулах
+                    </button>
+                  </div>
+                )}
                 {item.gapWarning && (
                   <div className="mt-1.5 flex items-start gap-1.5 rounded-md border border-amber-200 bg-amber-100/60 px-2 py-1.5 text-[11px] leading-snug text-amber-900 animate-fade-in">
                     <Sparkles className="h-3 w-3 flex-shrink-0 mt-0.5 text-amber-600" />

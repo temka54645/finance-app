@@ -4,6 +4,7 @@ import { requireUserId, UnauthorizedError } from "@/lib/auth-helpers";
 import { parsePdfWithBankDetection } from "@/lib/parsers/pdf";
 import { parseCSV, extractRawRows, type ParsedTransaction } from "@/lib/parsers/excel";
 import { parseWithBankDetection, type StatementMeta } from "@/lib/parsers/banks";
+import { splitDuplicates } from "@/lib/import-dedup";
 import { categorizeTransactions } from "@/lib/ai/categorize";
 import { aiExtractTransactions } from "@/lib/ai/extract";
 import { assertWithinLimit, LimitExceededError } from "@/lib/usage";
@@ -23,6 +24,9 @@ export async function POST(req: NextRequest) {
     const formData = await req.formData();
     const file = formData.get("file") as File | null;
     const bankNameInput = formData.get("bankName") as string | null;
+    // forceImport=true үед давхардал шүүлтийг алгасч бүх гүйлгээг оруулна
+    // (жишээ нь хэрэглэгч өөр данс/засварласан хуулгыг зориуд давхар оруулах).
+    const forceImport = formData.get("forceImport") === "true";
 
     if (!file) {
       return NextResponse.json({ error: "Файл байхгүй байна" }, { status: 400 });
@@ -63,6 +67,46 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({
         error: "Гүйлгээ олдсонгүй. Файлын форматыг шалгана уу."
       }, { status: 422 });
+    }
+
+    // ── Давхардал шүүлт ──
+    // Нэг данс/хугацааг хамарсан 2 өөр файл оруулахад ижил гүйлгээ давхар
+    // ордог байсныг (огноо+төрөл+дүн)-ээр аль хэдийн орсныг нь алгасч засна.
+    // forceImport=true бол алгасахгүй (хэрэглэгчийн зориудын override).
+    let skippedDuplicates = 0;
+    if (!forceImport && parsed.length > 0) {
+      let minTime = Infinity;
+      let maxTime = -Infinity;
+      for (const t of parsed) {
+        const ms = t.date.getTime();
+        if (ms < minTime) minTime = ms;
+        if (ms > maxTime) maxTime = ms;
+      }
+      // UTC өдрийн зөрөөнөөс (TDB serial vs Khan datetime) сэргийлж ±1 өдөр
+      const DAY = 86_400_000;
+      const existing = await prisma.transaction.findMany({
+        where: {
+          statement: { userId },
+          date: { gte: new Date(minTime - DAY), lte: new Date(maxTime + DAY) },
+        },
+        select: { date: true, amount: true, type: true },
+      });
+      const { fresh, duplicates } = splitDuplicates(parsed, existing);
+      skippedDuplicates = duplicates.length;
+      parsed = fresh;
+    }
+
+    // Бүх гүйлгээ аль хэдийн орсон бол шинэ statement үүсгэхгүй.
+    if (parsed.length === 0 && skippedDuplicates > 0) {
+      return NextResponse.json({
+        statement: null,
+        detectedBank,
+        count: 0,
+        incomeCount: 0,
+        expenseCount: 0,
+        skippedDuplicates,
+        message: `Энэ хуулгын ${skippedDuplicates} гүйлгээ бүгд аль хэдийн орсон тул алгаслаа.`,
+      });
     }
 
     // Хэрэглэгчийн төрөл — категорийн каталог personal/business-аас хамаарна.
@@ -145,6 +189,7 @@ export async function POST(req: NextRequest) {
       count: parsed.length,
       incomeCount,
       expenseCount,
+      skippedDuplicates,
       periodStart: stmtMeta?.periodStart ?? null,
       periodEnd: stmtMeta?.periodEnd ?? null,
       openingBalance: stmtMeta?.openingBalance ?? null,
