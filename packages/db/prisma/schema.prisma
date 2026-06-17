@@ -1,0 +1,158 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ── Auth.js v5 / NextAuth schema ───────────────────────────────────
+
+model User {
+  id             String    @id @default(cuid())
+  email          String    @unique
+  emailVerified  DateTime?
+  name           String?
+  image          String?
+  hashedPassword String?
+  /// "personal" | "business" — null үед onboarding-д шилжинэ
+  userType       String?
+  /// "user" | "admin" — admin л /sys/control самбар үзэх эрхтэй
+  role           String    @default("user")
+  /// "free" | "small" | "medium" | "large" — 4-tier багц (lib/plans.ts)
+  plan           String    @default("free")
+  /// "active" | "overdue" | "cancelled" — төлбөрийн төлөв
+  paymentStatus  String    @default("active")
+  /// MNT/сар — энэ хэрэглэгчийн сар тутмын төлбөр
+  planAmount     Float     @default(0)
+  /// Төлбөрийг сүүлд хүлээн авсан огноо
+  paidAt         DateTime?
+  createdAt      DateTime  @default(now())
+
+  accounts         Account[]
+  sessions         Session[]
+  statements       Statement[]
+  issues           Issue[]
+  customCategories CustomCategory[]
+}
+
+/// Хэрэглэгчийн өөрөө нэмсэн ангилал — статик каталогаас гадуур.
+model CustomCategory {
+  id        String   @id @default(cuid())
+  userId    String
+  name      String
+  /// "income" | "expense"
+  type      String
+  /// "personal" | "business" — аль горимын каталогт харагдах
+  userType  String
+  /// lib/category-icons.ts доторх icon key (жишээ: "shopping-cart"). null бол default "tag".
+  icon      String?
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, userType, type, name])
+  @@index([userId])
+}
+
+model Issue {
+  id          String    @id @default(cuid())
+  userId      String
+  /// "bug" | "feature" | "question" | "other"
+  type        String
+  title       String
+  description String
+  /// "new" | "in_progress" | "resolved" | "wont_fix"
+  status      String    @default("new")
+  adminNote   String?
+  createdAt   DateTime  @default(now())
+  resolvedAt  DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// ── App-specific models ────────────────────────────────────────────
+
+model Statement {
+  id              String        @id @default(cuid())
+  userId          String
+  fileName        String
+  bankName        String?
+  uploadedAt      DateTime      @default(now())
+  /// Хуулгын хамрах эхлэл огноо (file metadata-аас)
+  periodStart     DateTime?
+  /// Хуулгын хамрах төгсгөл огноо
+  periodEnd       DateTime?
+  /// Эхний үлдэгдэл (Opening Balance) — gap-detection-д хэрэглэнэ
+  openingBalance  Float?
+  /// Эцсийн үлдэгдэл (Closing Balance)
+  closingBalance  Float?
+
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  transactions Transaction[]
+
+  @@index([userId])
+  @@index([userId, periodEnd])
+}
+
+model Transaction {
+  id           String    @id @default(cuid())
+  statementId  String
+  statement    Statement @relation(fields: [statementId], references: [id], onDelete: Cascade)
+  date         DateTime
+  description  String
+  /// Харьцсан данс (counterparty account / counterparty name) — banking parser-аас гарна
+  counterparty String?
+  amount       Float
+  type         String
+  category     String    @default("Ангилаагүй")
+  note         String?
+  createdAt    DateTime  @default(now())
+
+  @@index([statementId])
+  @@index([date])
+}

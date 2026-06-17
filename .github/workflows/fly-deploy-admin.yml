@@ -1,25 +1,25 @@
-name: Fly Deploy
+name: Fly Deploy Admin
 
 on:
   push:
     branches:
       - master
     paths:
-      - 'apps/web/**'
+      - 'apps/admin/**'
       - 'packages/**'
       - 'package.json'
       - 'package-lock.json'
-      - 'fly.web.toml'
-      - '.github/workflows/fly-deploy.yml'
+      - 'fly.admin.toml'
+      - '.github/workflows/fly-deploy-admin.yml'
   workflow_dispatch:
 
 concurrency:
-  group: fly-deploy-${{ github.ref }}
+  group: fly-deploy-admin-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
   deploy:
-    name: Deploy to Fly.io
+    name: Deploy Admin to Fly.io
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -29,6 +29,6 @@ jobs:
       - uses: superfly/flyctl-actions/setup-flyctl@master
 
       - name: Deploy to Fly
-        run: flyctl deploy --remote-only -a finmate --config fly.web.toml --build-arg GIT_SHA=${{ github.sha }}
+        run: flyctl deploy --remote-only -a finmate-admin --config fly.admin.toml --build-arg GIT_SHA=${{ github.sha }}
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
