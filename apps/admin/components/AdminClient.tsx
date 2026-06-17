@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { signOut } from "next-auth/react";
 import {
   Shield, Users, Database, Activity, TrendingUp, TrendingDown,
@@ -92,6 +93,7 @@ function relativeTime(iso: string | null): string {
 type Tab = "overview" | "users" | "issues";
 
 export default function AdminClient() {
+  const router = useRouter();
   const [tab, setTab] = useState<Tab>("overview");
   const [stats, setStats] = useState<Stats | null>(null);
   const [users, setUsers] = useState<AdminUser[]>([]);
@@ -194,7 +196,14 @@ export default function AdminClient() {
               <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
             </button>
             <button
-              onClick={() => signOut({ callbackUrl: "/login" })}
+              onClick={async () => {
+                // redirect:false → session-г цэвэрлээд, өөрсдөө replace-ээр
+                // /login руу шилжинэ. Ингэснээр гарсны дараа back дарахад
+                // эрхгүй болсон самбарын хуучин snapshot дахин гарч ирэхгүй.
+                await signOut({ redirect: false });
+                router.replace("/login");
+                router.refresh();
+              }}
               className="inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium text-slate-600 hover:bg-rose-50 hover:text-rose-600 transition-colors"
               title="Админаас гарах"
             >

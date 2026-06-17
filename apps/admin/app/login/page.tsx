@@ -17,8 +17,14 @@ export default function AdminLoginPage() {
     const formData = new FormData(e.currentTarget);
     startPwTransition(async () => {
       const res = await adminLoginAction(formData);
-      if (res.ok) router.push("/");
-      else setPwError(res.error);
+      if (res.ok) {
+        // replace (push биш) — `/login`-г history-д үлдээхгүй. Ингэснээр
+        // самбараас back дарахад хуучин (cache-д хадгалагдсан) login форм
+        // дахин гарч ирэхгүй. refresh нь Router Client Cache-г цэвэрлэж,
+        // самбарыг шинэ session-оор дахин render хийлгэнэ.
+        router.replace("/");
+        router.refresh();
+      } else setPwError(res.error);
     });
   };
 
