@@ -11,7 +11,7 @@ export const metadata: Metadata = {
 };
 
 export default async function AdminLoginLayout({ children }: { children: React.ReactNode }) {
-  // Нэвтэрсэн admin → /sys/control, нэвтэрсэн энгийн хэрэглэгч → /.
+  // Нэвтэрсэн admin → самбар (/), нэвтрээгүй бол энэ login хуудас.
   await redirectIfAuthenticated();
   return children;
 }

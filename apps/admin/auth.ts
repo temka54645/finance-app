@@ -1,6 +1,5 @@
 import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
-import Google from "next-auth/providers/google";
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
@@ -48,21 +47,6 @@ const providers: Provider[] = [
   }),
 ];
 
-if (process.env.AUTH_GOOGLE_ID && process.env.AUTH_GOOGLE_SECRET) {
-  providers.push(
-    Google({
-      clientId: process.env.AUTH_GOOGLE_ID,
-      clientSecret: process.env.AUTH_GOOGLE_SECRET,
-      allowDangerousEmailAccountLinking: false,
-      authorization: {
-        params: {
-          prompt: "select_account",
-        },
-      },
-    })
-  );
-}
-
 export const { handlers, auth, signIn, signOut } = NextAuth({
   adapter: PrismaAdapter(prisma) as Adapter,
   session: { strategy: "jwt" },
@@ -71,17 +55,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   },
   providers,
   callbacks: {
-    // Google OAuth-аар нэвтрэхэд серверт дахин role шалгана — админ биш бол татгалзана.
-    signIn: async ({ user, account }) => {
-      if (account?.provider === "google") {
-        const dbUser = await prisma.user.findUnique({
-          where: { email: (user.email ?? "").toLowerCase() },
-          select: { role: true },
-        });
-        return dbUser?.role === "admin";
-      }
-      return true;
-    },
     jwt: async ({ token, user, trigger }) => {
       if (user) {
         token.id = user.id;
