@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { Prisma } from "@finmate/db";
 import { prisma } from "@/lib/db";
 import { requireUserId, UnauthorizedError } from "@/lib/auth-helpers";
 
@@ -44,6 +45,15 @@ export async function PATCH(req: NextRequest) {
   } catch (err) {
     if (err instanceof UnauthorizedError) {
       return NextResponse.json({ error: err.message }, { status: 401 });
+    }
+    // P2025 — шинэчлэх хэрэглэгчийн row олдсонгүй (жишээ нь session-ы id-тай
+    // хэрэглэгч устсан "сүнс" session). 500-аар унагахын оронд 401 өгч,
+    // дахин нэвтрэхийг шаардана.
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2025") {
+      return NextResponse.json(
+        { error: "Сессион хүчингүй болсон байна. Дахин нэвтэрнэ үү." },
+        { status: 401 }
+      );
     }
     throw err;
   }

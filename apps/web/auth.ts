@@ -101,23 +101,36 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     },
     session: async ({ session, token }) => {
       if (session.user && token.id) {
-        session.user.id = token.id as string;
         // userType / role нь DB-д өөрчлөгдсөн ч JWT cookie-д хуучин утгатай үлдэх
         // асуудлаас сэргийлэх — session callback дотор DB-ээс үргэлж шинэхэн уншина.
         // Энэ нь session фэтч бүрт нэг индекстэй lookup нэмнэ, гэхдээ
         // userType-аас хамаарсан category list зэрэг UI зөв ажиллах баталгаа болно.
+        let u: { userType: string | null; role: string } | null;
         try {
-          const u = await prisma.user.findUnique({
+          u = await prisma.user.findUnique({
             where: { id: token.id as string },
             select: { userType: true, role: true },
           });
-          (session.user as { userType?: string | null }).userType = u?.userType ?? null;
-          (session.user as { role?: string | null }).role = u?.role ?? "user";
         } catch {
-          // DB алдаа гарвал JWT-ийн утгад буцна (degraded mode)
+          // DB алдаа гарвал JWT-ийн утгад буцна (degraded mode) — хэрэглэгчийг
+          // түр зуурын DB саатлаас болж гаргахгүй.
+          session.user.id = token.id as string;
           (session.user as { userType?: string | null }).userType = (token.userType as string | null) ?? null;
           (session.user as { role?: string | null }).role = (token.role as string | null) ?? "user";
+          return session;
         }
+
+        if (!u) {
+          // Хэрэглэгчийн row DB-д байхгүй (жишээ нь account устгаад дахин үүсгэсэн).
+          // Энэ JWT нь "сүнс" session — id-г өгөхгүй орхиж session-ийг хүчингүй
+          // болгоно. Ингэснээр requireUserId() 401 өгч, route guard /login руу
+          // зөв чиглүүлнэ (хуучин id-аар prisma.update хийж P2025/500 гарахаас сэргийлнэ).
+          return session;
+        }
+
+        session.user.id = token.id as string;
+        (session.user as { userType?: string | null }).userType = u.userType ?? null;
+        (session.user as { role?: string | null }).role = u.role ?? "user";
       }
       return session;
     },
