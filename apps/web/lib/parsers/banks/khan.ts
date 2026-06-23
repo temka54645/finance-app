@@ -65,6 +65,33 @@ const COL = {
   counterparty: 7,
 };
 
+type KhanCol = typeof COL;
+
+/**
+ * Header мөрнөөс баганы байрлалыг ДИНАМИКААР тогтооно.
+ *
+ * Учир: хувь хүний хуулгад "Кредит гүйлгээ" нь 3-р, "Дебит гүйлгээ" нь 4-р баганад
+ * байдаг бол БАЙГУУЛЛАГЫН хуулгад эдгээр нь СОЛИГДСОН ("Дебит" 3-р, "Кредит" 4-р)
+ * байна. Хатуу индекс ашиглавал орлого/зарлага хольцолдоно. Тиймээс header текстээс
+ * байрлалыг олж, олдоогүй баганад л анхдагч `COL`-ийг ашиглана.
+ */
+function resolveKhanColumns(headerRow: unknown[]): KhanCol {
+  const find = (re: RegExp, fallback: number): number => {
+    const idx = headerRow.findIndex(c => typeof c === "string" && re.test(c));
+    return idx >= 0 ? idx : fallback;
+  };
+  return {
+    date: find(/гүйлгээний огноо/i, COL.date),
+    branch: find(/салбар/i, COL.branch),
+    openingBalance: find(/эхний\s+үлдэгдэл/i, COL.openingBalance),
+    credit: find(/кредит\s+гүйлгээ/i, COL.credit),
+    debit: find(/дебит\s+гүйлгээ/i, COL.debit),
+    closingBalance: find(/эцсийн\s+үлдэгдэл/i, COL.closingBalance),
+    description: find(/гүйлгээний утга/i, COL.description),
+    counterparty: find(/харьцсан данс/i, COL.counterparty),
+  };
+}
+
 function parseKhanDate(val: unknown): Date | null {
   if (val instanceof Date && !isNaN(val.getTime())) return val;
   if (typeof val !== "string") return null;
@@ -242,14 +269,18 @@ export function parseKhanBank(buffer: Buffer): ParsedTransaction[] {
   }
   if (headerIdx < 0) return [];
 
+  // Хувь хүн ба байгууллагын хуулгад Дебит/Кредит баганы дараалал өөр тул
+  // header мөрнөөс байрлалыг динамикаар тогтооно.
+  const col = resolveKhanColumns(rows[headerIdx]);
+
   const results: ParsedTransaction[] = [];
   for (let i = headerIdx + 1; i < rows.length; i++) {
     const row = rows[i];
-    const date = parseKhanDate(row[COL.date]);
+    const date = parseKhanDate(row[col.date]);
     if (!date) continue;
 
-    const credit = toNumber(row[COL.credit]);
-    const debit  = toNumber(row[COL.debit]);  // negative or 0
+    const credit = toNumber(row[col.credit]);
+    const debit  = toNumber(row[col.debit]);  // negative or 0
 
     let amount: number;
     if (credit > 0) amount = credit;
@@ -257,8 +288,8 @@ export function parseKhanBank(buffer: Buffer): ParsedTransaction[] {
     else if (debit > 0) amount = -debit;       // edge case: positive expense string
     else continue;
 
-    const desc = String(row[COL.description] ?? "").trim();
-    const counterpartyRaw = String(row[COL.counterparty] ?? "").trim();
+    const desc = String(row[col.description] ?? "").trim();
+    const counterpartyRaw = String(row[col.counterparty] ?? "").trim();
     const description = desc || counterpartyRaw || "Гүйлгээ";
     // ХААН-ы "Харьцсан данс" нь дугаар (нэр баганагүй). Найдвартай байхын тулд ангилна.
     const { name: cpName, account: cpAccount } = splitCounterparty(counterpartyRaw);
@@ -316,24 +347,26 @@ export function extractKhanMeta(buffer: Buffer): StatementMeta {
   }
   if (headerIdx < 0) return meta;
 
-  // First data row → openingBalance = col 2 (Эхний үлдэгдэл)
-  // Last data row → closingBalance = col 5 (Эцсийн үлдэгдэл)
+  const col = resolveKhanColumns(rows[headerIdx]);
+
+  // First data row → openingBalance (Эхний үлдэгдэл)
+  // Last data row → closingBalance (Эцсийн үлдэгдэл)
   let firstDataIdx = -1;
   let lastDataIdx = -1;
   for (let i = headerIdx + 1; i < rows.length; i++) {
     const row = rows[i];
     // Огноо нь "2026-03-01 ..." форматтай үед л data row
-    if (typeof row[0] === "string" && /^\d{4}-\d{1,2}-\d{1,2}/.test(row[0])) {
+    if (typeof row[col.date] === "string" && /^\d{4}-\d{1,2}-\d{1,2}/.test(row[col.date] as string)) {
       if (firstDataIdx < 0) firstDataIdx = i;
       lastDataIdx = i;
     }
   }
   if (firstDataIdx >= 0) {
-    const open = Number(rows[firstDataIdx][2]);
+    const open = Number(rows[firstDataIdx][col.openingBalance]);
     if (!isNaN(open)) meta.openingBalance = open;
   }
   if (lastDataIdx >= 0) {
-    const close = Number(rows[lastDataIdx][5]);
+    const close = Number(rows[lastDataIdx][col.closingBalance]);
     if (!isNaN(close)) meta.closingBalance = close;
   }
 
