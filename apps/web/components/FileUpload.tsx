@@ -40,7 +40,8 @@ interface QueueItem {
   statementId?: string;
 }
 
-const ACCEPT = ".pdf,.xlsx,.xls,.csv";
+// TODO(pdf): PDF parser бүрэн бэлэн болоход ".pdf," -г буцааж нэмнэ.
+const ACCEPT = ".xlsx,.xls,.csv";
 
 function fmtBytes(n: number) {
   if (n < 1024) return n + " B";
@@ -334,7 +335,7 @@ export default function FileUpload({ onSuccess, onRequestClose, compact = false 
             </p>
             {!compact && (
               <p className="text-sm text-gray-400 mt-1">
-                PDF, Excel (.xlsx), CSV — олон файлыг нэг дор сонгож болно
+                Excel (.xlsx), CSV — олон файлыг нэг дор сонгож болно
               </p>
             )}
           </>

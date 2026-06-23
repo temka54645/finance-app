@@ -1,5 +1,6 @@
 import * as XLSX from "xlsx";
 import type { ParsedTransaction } from "../excel";
+import { splitCounterparty } from "@/lib/counterparty";
 import { findLabeledValue, parseDateRange } from "./metaHelpers";
 
 interface StatementMeta {
@@ -89,6 +90,24 @@ function toNumber(val: unknown): number {
   return 0;
 }
 
+// ХААН-ы орлогын гүйлгээний "Гүйлгээний утга" дотор харьцагчийн НЭР
+// шигтгэгдсэн байдаг (тусдаа нэрийн багана байдаггүй):
+//   "ХААНААС: <дүн> <НЭР...> [<дансны дугаар>]"
+//   ж: "ХААНААС: 150000 БЯМБАДОРЖ ГАНЗОРИГ 2105171114" → "БЯМБАДОРЖ ГАНЗОРИГ"
+//   Зөвхөн дүнтэй ("ХААНААС: 150000") бол нэр буцаахгүй.
+// Дансны дугаар нь "Харьцсан данс" баганад тусдаа байдаг тул эндээс зөвхөн
+// нэрийг л авна.
+function extractKhanCounterpartyName(desc: string): string | undefined {
+  const m = desc.match(/ХААНААС[:：]\s*(.+)/i);
+  if (!m) return undefined;
+  let rest = m[1].replace(/\s+/g, " ").trim();
+  rest = rest.replace(/^[\d.,]+\s+/, "");       // эхний дүнг хасах
+  rest = rest.replace(/\s+\d{6,}$/, "").trim(); // төгсгөлийн дансны дугаарыг хасах
+  // Үлдсэн нь хоосон эсвэл зөвхөн тоо бол нэр биш (зөвхөн дүн байсан тохиолдол).
+  if (!rest || /^[\d.,]+$/.test(rest)) return undefined;
+  return rest;
+}
+
 // ── ХААН Банкны PDF хуулга ────────────────────────────────────────
 //
 // PDF хэлбэр ("Депозит дансны дэлгэрэнгүй хуулга"):
@@ -135,8 +154,18 @@ function flushKhanPdfRow(row: KhanPdfRow | null, out: ParsedTransaction[]): void
     counterparty = cp[1];
     desc = desc.slice(0, desc.length - cp[1].length).trim();
   }
+  // "ХААНААС: <дүн> <НЭР>"-ээс нэр; нэр байхгүй бол гүйлгээний утгыг өөрийг нь
+  // харьцагчийн нэрэнд тооцно (дугаар нь counterparty талбарт тусдаа орсон).
+  const cpName = extractKhanCounterpartyName(desc) ?? (desc || undefined);
   if (!desc) desc = counterparty ?? "Гүйлгээ";
-  out.push({ date: row.date, description: desc, counterparty, amount: row.amount });
+  out.push({
+    date: row.date,
+    description: desc,
+    counterparty,
+    counterpartyName: cpName,
+    counterpartyAccount: counterparty,
+    amount: row.amount,
+  });
 }
 
 /** ХААН Банкны PDF хуулгын текстээс гүйлгээ задлах. */
@@ -231,8 +260,20 @@ export function parseKhanBank(buffer: Buffer): ParsedTransaction[] {
     const desc = String(row[COL.description] ?? "").trim();
     const counterpartyRaw = String(row[COL.counterparty] ?? "").trim();
     const description = desc || counterpartyRaw || "Гүйлгээ";
+    // ХААН-ы "Харьцсан данс" нь дугаар (нэр баганагүй). Найдвартай байхын тулд ангилна.
+    const { name: cpName, account: cpAccount } = splitCounterparty(counterpartyRaw);
+    // Нэрийн багана байхгүй тул "Гүйлгээний утга" доторх "ХААНААС: ..."-аас нэрийг авна;
+    // нэр олдохгүй бол гүйлгээний утгыг өөрийг нь харьцагчийн нэрэнд тооцно.
+    const cpNameFinal = cpName ?? extractKhanCounterpartyName(desc) ?? (desc || undefined);
 
-    results.push({ date, description, counterparty: counterpartyRaw || undefined, amount });
+    results.push({
+      date,
+      description,
+      counterparty: counterpartyRaw || undefined,
+      counterpartyName: cpNameFinal,
+      counterpartyAccount: cpAccount,
+      amount,
+    });
   }
 
   return results;

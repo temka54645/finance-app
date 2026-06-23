@@ -9,6 +9,7 @@ import CounterpartyInsights from "@/components/CounterpartyInsights";
 import DashboardHeadline, { type PeriodOverPeriod, type PeriodPoint } from "@/components/DashboardHeadline";
 import CategorizationCoverage from "@/components/CategorizationCoverage";
 import PerAccountBreakdown, { type AccountRow } from "@/components/PerAccountBreakdown";
+import CategoryBreakdownCards, { type CategoryItem } from "@/components/CategoryBreakdownCards";
 import MissingDataSection from "@/components/MissingDataSection";
 import { useDataRefresh } from "@/lib/use-data-refresh";
 
@@ -19,6 +20,7 @@ interface OverviewReport {
   incomeCount: number;
   expenseCount: number;
   uncategorizedCount: number;
+  byCategory: CategoryItem[];
 }
 
 interface DashboardData {
@@ -125,6 +127,9 @@ export default function DashboardClient() {
 
           {/* Сарын динамик — интерактив (жил сонгох, бүгдийг нэгтгэх, ангиллын pie) */}
           <MonthlyBarChart lowCoverage={lowCoverage} uncategorizedCount={dashboard?.coverage.uncategorizedCount ?? 0} />
+
+          {/* Ангиллын задаргаа — орлого/зарлага ангиллын төрлөөр (бүх хугацаа) */}
+          <CategoryBreakdownCards byCategory={overview.byCategory ?? []} />
 
           {/* Данс тус бүрийн үлдэгдэл ба гүйлгээний задаргаа */}
           {dashboard && <PerAccountBreakdown accounts={dashboard.perAccount} />}

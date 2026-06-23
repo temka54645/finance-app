@@ -1,5 +1,6 @@
 import * as XLSX from "xlsx";
 import type { ParsedTransaction } from "../excel";
+import { splitCounterparty } from "@/lib/counterparty";
 
 // Note: StatementMeta-г import хийхийн оронд дотооддоо тодорхойлсон —
 // xac.ts ⇄ index.ts хооронд circular import гарахаас сэргийлэх.
@@ -68,9 +69,11 @@ export function parseXacBank(buffer: Buffer): ParsedTransaction[] {
     const debit = Number(row["Зарлага"]) || 0;
     const description = String(row["Гүйлгээний утга"] ?? "").trim() || "Гүйлгээ";
     const counterparty = String(row["Харьцсан данс"] ?? "").trim() || undefined;
+    // XAC нэг "Харьцсан данс" баганатай — нэр эсвэл дугаарыг ангилж салгана.
+    const { name: cpName, account: cpAccount } = splitCounterparty(counterparty);
 
-    if (credit > 0) results.push({ date, description, counterparty, amount: credit });
-    else if (debit > 0) results.push({ date, description, counterparty, amount: -debit });
+    if (credit > 0) results.push({ date, description, counterparty, counterpartyName: cpName, counterpartyAccount: cpAccount, amount: credit });
+    else if (debit > 0) results.push({ date, description, counterparty, counterpartyName: cpName, counterpartyAccount: cpAccount, amount: -debit });
   }
 
   return results;

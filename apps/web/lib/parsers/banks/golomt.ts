@@ -137,7 +137,15 @@ export function parseGolomtBank(buffer: Buffer): ParsedTransaction[] {
     const counterparty = counterpartyName ||
       (counterpartyAcct ? counterpartyAcct : undefined);
 
-    results.push({ date, description, counterparty, amount });
+    results.push({
+      date,
+      description,
+      counterparty,
+      // Голомт нэр (col 3) ба данс (col 4)-ыг тус тусад нь өгдөг — салгаж хадгална.
+      counterpartyName: counterpartyName || undefined,
+      counterpartyAccount: counterpartyAcct || undefined,
+      amount,
+    });
   }
 
   return results;

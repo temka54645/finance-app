@@ -188,7 +188,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
               </button>
             </div>
             <p className="mb-4 text-xs text-slate-500">
-              PDF, Excel (.xlsx) эсвэл CSV формат дэмжигдэнэ. Файл доторх гүйлгээ нь огнооны дагуу зөв сард байршина.
+              Excel (.xlsx) эсвэл CSV формат дэмжигдэнэ. Файл доторх гүйлгээ нь огнооны дагуу зөв сард байршина.
             </p>
             <FileUpload
               onSuccess={() => emitDataChanged()}

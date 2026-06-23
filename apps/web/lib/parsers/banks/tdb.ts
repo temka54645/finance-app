@@ -1,5 +1,6 @@
 import * as XLSX from "xlsx";
 import type { ParsedTransaction } from "../excel";
+import { splitCounterparty } from "@/lib/counterparty";
 import { findLabeledValue, parseDateRange } from "./metaHelpers";
 
 interface StatementMeta {
@@ -76,8 +77,17 @@ export function parseTdbBank(buffer: Buffer): ParsedTransaction[] {
     const desc = String(row[COL.description] ?? "").trim();
     const counterpartyRaw = String(row[COL.counterparty] ?? "").trim();
     const description = desc || counterpartyRaw || "Гүйлгээ";
+    // TDB нэг "Харьцсан данс" баганатай (ихэвчлэн нэр) — ангилж салгана.
+    const { name: cpName, account: cpAccount } = splitCounterparty(counterpartyRaw);
 
-    results.push({ date, description, counterparty: counterpartyRaw || undefined, amount });
+    results.push({
+      date,
+      description,
+      counterparty: counterpartyRaw || undefined,
+      counterpartyName: cpName,
+      counterpartyAccount: cpAccount,
+      amount,
+    });
   }
 
   return results;

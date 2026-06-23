@@ -1,10 +1,15 @@
 import * as XLSX from "xlsx";
+import { splitCounterparty } from "@/lib/counterparty";
 
 export interface ParsedTransaction {
   date: Date;
   description: string;
-  /** Харьцсан данс / counterparty нэр эсвэл account number (optional) */
+  /** Харьцсан данс — нэр эсвэл дугаар (legacy, нэгдсэн). Back-compat-д хадгална. */
   counterparty?: string;
+  /** Харьцагчийн НЭР (салгаж хадгална). Банк өгөхгүй бол undefined. */
+  counterpartyName?: string;
+  /** Харьцсан дансны ДУГААР (салгаж хадгална). Банк өгөхгүй бол undefined. */
+  counterpartyAccount?: string;
   amount: number; // эерэг = орлого, сөрөг = зарлага
 }
 
@@ -134,7 +139,10 @@ function buildTransaction(
   // Тайлбар олдоогүй бол харьцсан дансыг тайлбар болгон ашиглана (bank template-уудтай нийцүүлэв)
   if (!description) description = counterparty ?? "Гүйлгээ";
 
-  return { date, description, counterparty, amount };
+  // Нэг баганатай тул нэр/дугаарыг ангилж салгана.
+  const { name: counterpartyName, account: counterpartyAccount } = splitCounterparty(counterparty);
+
+  return { date, description, counterparty, counterpartyName, counterpartyAccount, amount };
 }
 
 // ── Header offset-ийн чанарыг үнэлэх ──────────────────────────────

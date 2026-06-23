@@ -145,8 +145,12 @@ model Transaction {
   statement    Statement @relation(fields: [statementId], references: [id], onDelete: Cascade)
   date         DateTime
   description  String
-  /// Харьцсан данс (counterparty account / counterparty name) — banking parser-аас гарна
+  /// Харьцсан данс — нэр эсвэл дугаар (legacy, нэгдсэн). Хуучин мөрүүд + бүлэглэх түлхүүр.
   counterparty String?
+  /// Харьцагчийн НЭР (салгаж хадгалсан) — ж: "ОТГОНБАЯР ХӨХ". Байхгүй банкинд null.
+  counterpartyName    String?
+  /// Харьцсан дансны ДУГААР (салгаж хадгалсан) — ж: "5016764510" / "MN24...". Байхгүй бол null.
+  counterpartyAccount String?
   amount       Float
   type         String
   category     String    @default("Ангилаагүй")

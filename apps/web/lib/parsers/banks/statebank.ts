@@ -113,7 +113,15 @@ export function parseStateBank(buffer: Buffer): ParsedTransaction[] {
     // Counterparty preferr account name + number combo if available
     const counterparty = [accName, accNumber].filter(s => s && s !== "FEE").join(" · ") || undefined;
 
-    results.push({ date, description, counterparty, amount });
+    results.push({
+      date,
+      description,
+      counterparty,
+      // Төрийн банк нэр (col 9) ба данс (col 8)-ыг тусад нь өгдөг. "FEE" нь данс биш.
+      counterpartyName: accName || undefined,
+      counterpartyAccount: (accNumber && accNumber !== "FEE") ? accNumber : undefined,
+      amount,
+    });
   }
 
   return results;

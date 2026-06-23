@@ -13,6 +13,8 @@ const FULL_N = 300;
 
 interface GroupRow {
   counterparty: string;
+  name: string | null;
+  account: string | null;
   type: string;
   total: number;
   count: number;
@@ -22,6 +24,8 @@ interface GroupRow {
 
 interface LargestRow {
   counterparty: string | null;
+  name: string | null;
+  account: string | null;
   description: string;
   date: Date;
   amount: number;
@@ -69,6 +73,8 @@ export async function GET(req: NextRequest) {
       // Харьцагч × төрөл бүрийн нийт дүн, тоо, нэг удаагийн дээд дүн
       prisma.$queryRaw<GroupRow[]>`
         SELECT t."counterparty" AS counterparty,
+               MAX(t."counterpartyName") AS name,
+               MAX(t."counterpartyAccount") AS account,
                t."type" AS type,
                SUM(t."amount")::float AS total,
                COUNT(*)::int AS count,
@@ -85,6 +91,8 @@ export async function GET(req: NextRequest) {
       // Хамгийн өндөр дүнтэй ганц гүйлгээнүүд (картын жагсаалт — харьцагчгүй ч багтана)
       prisma.$queryRaw<LargestRow[]>`
         SELECT t."counterparty" AS counterparty,
+               t."counterpartyName" AS name,
+               t."counterpartyAccount" AS account,
                t."description" AS description,
                t."date" AS date,
                t."amount"::float AS amount,
@@ -103,38 +111,43 @@ export async function GET(req: NextRequest) {
       .filter(r => r.type === "income")
       .sort((a, b) => b.total - a.total)
       .slice(0, limit)
-      .map(r => ({ counterparty: r.counterparty, total: r.total, count: r.count, uncatCount: r.uncatCount }));
+      .map(r => ({ counterparty: r.counterparty, name: r.name, account: r.account, total: r.total, count: r.count, uncatCount: r.uncatCount }));
 
     const topExpense = grouped
       .filter(r => r.type === "expense")
       .sort((a, b) => b.total - a.total)
       .slice(0, limit)
-      .map(r => ({ counterparty: r.counterparty, total: r.total, count: r.count, uncatCount: r.uncatCount }));
+      .map(r => ({ counterparty: r.counterparty, name: r.name, account: r.account, total: r.total, count: r.count, uncatCount: r.uncatCount }));
 
     // 3: Хамгийн их давтамжтай харьцагч — орлого+зарлага нийлбэр тоогоор
-    const freqMap = new Map<string, { count: number; total: number; uncatCount: number }>();
+    type Agg = { name: string | null; account: string | null; count: number; total: number; uncatCount: number };
+    const freqMap = new Map<string, Agg>();
     // 4: Харьцагч тус бүрийн нэг удаагийн хамгийн өндөр гүйлгээ
-    const maxMap = new Map<string, { max: number; count: number; uncatCount: number }>();
+    const maxMap = new Map<string, { name: string | null; account: string | null; max: number; count: number; uncatCount: number }>();
     for (const r of grouped) {
-      const e = freqMap.get(r.counterparty) ?? { count: 0, total: 0, uncatCount: 0 };
+      const e = freqMap.get(r.counterparty) ?? { name: null, account: null, count: 0, total: 0, uncatCount: 0 };
       e.count += r.count;
       e.total += r.total;
       e.uncatCount += r.uncatCount;
+      e.name = e.name ?? r.name;
+      e.account = e.account ?? r.account;
       freqMap.set(r.counterparty, e);
 
-      const m = maxMap.get(r.counterparty) ?? { max: 0, count: 0, uncatCount: 0 };
+      const m = maxMap.get(r.counterparty) ?? { name: null, account: null, max: 0, count: 0, uncatCount: 0 };
       m.max = Math.max(m.max, r.max);
       m.count += r.count;
       m.uncatCount += r.uncatCount;
+      m.name = m.name ?? r.name;
+      m.account = m.account ?? r.account;
       maxMap.set(r.counterparty, m);
     }
     const mostFrequent = Array.from(freqMap.entries())
-      .map(([counterparty, v]) => ({ counterparty, count: v.count, total: v.total, uncatCount: v.uncatCount }))
+      .map(([counterparty, v]) => ({ counterparty, name: v.name, account: v.account, count: v.count, total: v.total, uncatCount: v.uncatCount }))
       .sort((a, b) => b.count - a.count)
       .slice(0, limit);
 
     const largestParties = Array.from(maxMap.entries())
-      .map(([counterparty, v]) => ({ counterparty, max: v.max, count: v.count, uncatCount: v.uncatCount }))
+      .map(([counterparty, v]) => ({ counterparty, name: v.name, account: v.account, max: v.max, count: v.count, uncatCount: v.uncatCount }))
       .sort((a, b) => b.max - a.max)
       .slice(0, limit);
 
@@ -143,6 +156,8 @@ export async function GET(req: NextRequest) {
       topExpense,
       largest: largest.map(r => ({
         counterparty: r.counterparty,
+        name: r.name,
+        account: r.account,
         description: r.description,
         date: r.date,
         amount: r.amount,

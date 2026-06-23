@@ -10,17 +10,23 @@ import {
   ArrowUpRight,
   ArrowDownRight,
   ArrowRight,
+  CreditCard,
 } from "lucide-react";
 import { useDataRefresh } from "@/lib/use-data-refresh";
+import { counterpartyLabel } from "@/lib/counterparty";
 
 interface TopRow {
   counterparty: string;
+  name: string | null;
+  account: string | null;
   total: number;
   count: number;
 }
 
 interface LargestRow {
   counterparty: string | null;
+  name: string | null;
+  account: string | null;
   description: string;
   date: string;
   amount: number;
@@ -29,6 +35,8 @@ interface LargestRow {
 
 interface FreqRow {
   counterparty: string;
+  name: string | null;
+  account: string | null;
   count: number;
   total: number;
 }
@@ -92,14 +100,76 @@ function Card({
   );
 }
 
+/**
+ * Харьцагчийг нэгдсэн форматаар харуулна: «нэр» + доор нь «Данс <дугаар>».
+ * Банкны хуулга нэр/дугаарыг тусад нь өгдөг (Голомт, Төрийн банк) бол хоёуланг,
+ * зөвхөн дугаар өгдөг (ХААН) бол дугаарыг, зөвхөн нэр бол нэрийг харуулна.
+ * Хуучин (салгаагүй) мөрд `legacy` стрингээс ангилж нөхнө.
+ */
+function CounterpartyDisplay({
+  name,
+  account,
+  legacy,
+}: {
+  name?: string | null;
+  account?: string | null;
+  legacy?: string | null;
+}) {
+  let nm = (name ?? "").trim();
+  let acct = (account ?? "").trim();
+  // Салгасан талбар байхгүй хуучин мөр — legacy утгыг ангилж нөхнө.
+  if (!nm && !acct && legacy) {
+    const cp = counterpartyLabel(legacy);
+    if (cp.isEmpty) {
+      // утгагүй
+    } else if (cp.isAccount) {
+      acct = cp.text;
+    } else {
+      nm = cp.text;
+    }
+  }
+
+  if (nm && acct) {
+    return (
+      <span className="block min-w-0" title={`${nm} · ${acct}`}>
+        <span className="block truncate text-slate-700">{nm}</span>
+        <span className="flex items-center gap-1 text-[11px] text-slate-400">
+          <CreditCard className="h-3 w-3 flex-shrink-0" />
+          <span className="truncate tabular-nums">Данс {acct}</span>
+        </span>
+      </span>
+    );
+  }
+  if (acct) {
+    return (
+      <span className="flex min-w-0 items-center gap-1.5 text-slate-600" title={`Данс ${acct}`}>
+        <CreditCard className="h-3.5 w-3.5 flex-shrink-0 text-slate-400" />
+        <span className="min-w-0 flex-1 truncate tabular-nums">Данс {acct}</span>
+      </span>
+    );
+  }
+  if (nm) {
+    return (
+      <span className="block truncate text-slate-700" title={nm}>
+        {nm}
+      </span>
+    );
+  }
+  return <span className="block truncate text-slate-400">Тодорхойгүй</span>;
+}
+
 function RankRow({
   rank,
-  name,
+  cpName,
+  cpAccount,
+  legacy,
   primary,
   secondary,
 }: {
   rank: number;
-  name: string;
+  cpName?: string | null;
+  cpAccount?: string | null;
+  legacy?: string | null;
   primary: string;
   secondary: string;
 }) {
@@ -108,8 +178,8 @@ function RankRow({
       <span className="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full bg-white text-[10px] font-semibold text-slate-500 ring-1 ring-slate-200">
         {rank}
       </span>
-      <span className="min-w-0 flex-1 truncate text-sm text-slate-700" title={name}>
-        {name}
+      <span className="min-w-0 flex-1 text-sm">
+        <CounterpartyDisplay name={cpName} account={cpAccount} legacy={legacy} />
       </span>
       <span className="flex-shrink-0 text-right">
         <span className="block text-sm font-semibold tabular-nums text-slate-900">{primary}</span>
@@ -213,7 +283,9 @@ export default function CounterpartyInsights({ year, month }: Props = {}) {
                 <RankRow
                   key={r.counterparty}
                   rank={i + 1}
-                  name={r.counterparty}
+                  cpName={r.name}
+                  cpAccount={r.account}
+                  legacy={r.counterparty}
                   primary={fmt(r.total)}
                   secondary={`${r.count} гүйлгээ`}
                 />
@@ -238,7 +310,9 @@ export default function CounterpartyInsights({ year, month }: Props = {}) {
                 <RankRow
                   key={r.counterparty}
                   rank={i + 1}
-                  name={r.counterparty}
+                  cpName={r.name}
+                  cpAccount={r.account}
+                  legacy={r.counterparty}
                   primary={fmt(r.total)}
                   secondary={`${r.count} гүйлгээ`}
                 />
@@ -269,8 +343,14 @@ export default function CounterpartyInsights({ year, month }: Props = {}) {
                     )}
                   </span>
                   <span className="min-w-0 flex-1">
-                    <span className="block truncate text-sm text-slate-700" title={r.counterparty ?? r.description}>
-                      {r.counterparty || r.description || "Гүйлгээ"}
+                    <span className="block text-sm">
+                      {(r.name || r.account || r.counterparty) ? (
+                        <CounterpartyDisplay name={r.name} account={r.account} legacy={r.counterparty} />
+                      ) : (
+                        <span className="block truncate text-slate-700" title={r.description}>
+                          {r.description || "Гүйлгээ"}
+                        </span>
+                      )}
                     </span>
                     <span className="block text-[10px] text-slate-400">{fmtDate(r.date)}</span>
                   </span>
@@ -303,7 +383,9 @@ export default function CounterpartyInsights({ year, month }: Props = {}) {
                 <RankRow
                   key={r.counterparty}
                   rank={i + 1}
-                  name={r.counterparty}
+                  cpName={r.name}
+                  cpAccount={r.account}
+                  legacy={r.counterparty}
                   primary={`${r.count} удаа`}
                   secondary={fmt(r.total)}
                 />

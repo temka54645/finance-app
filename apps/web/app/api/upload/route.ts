@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { requireUserId, UnauthorizedError } from "@/lib/auth-helpers";
-import { parsePdfWithBankDetection } from "@/lib/parsers/pdf";
+// TODO(pdf): PDF боловсруулалт түр идэвхгүй — re-enable хийхэд энэ import-г сэргээнэ.
+// import { parsePdfWithBankDetection } from "@/lib/parsers/pdf";
 import { parseCSV, extractRawRows, type ParsedTransaction } from "@/lib/parsers/excel";
 import { parseWithBankDetection, type StatementMeta } from "@/lib/parsers/banks";
 import { splitDuplicates } from "@/lib/import-dedup";
@@ -40,13 +41,17 @@ export async function POST(req: NextRequest) {
     let detectedBank: string | null = null;
     let stmtMeta: StatementMeta | undefined = undefined;
 
-    const tParseStart = performance.now();
+    // TODO(pdf): PDF parser бүрэн бэлэн болоход энэ хаалтыг устгана.
+    // Одоохондоо PDF боловсруулалт идэвхгүй — drag-drop-оор PDF орвол
+    // эелдэг мессежээр буцаана (accept attribute-г тойрч болзошгүй).
     if (ext === "pdf") {
-      const result = await parsePdfWithBankDetection(buffer);
-      parsed = result.transactions;
-      detectedBank = result.detectedBank;
-      stmtMeta = result.meta;
-    } else if (ext === "csv") {
+      return NextResponse.json({
+        error: "PDF оруулах боломж түр идэвхгүй байна. Excel (.xlsx) эсвэл CSV ашиглана уу. Удахгүй дахин нээгдэнэ.",
+      }, { status: 422 });
+    }
+
+    const tParseStart = performance.now();
+    if (ext === "csv") {
       parsed = parseCSV(buffer);
     } else if (ext === "xlsx" || ext === "xls") {
       const result = parseWithBankDetection(buffer);
@@ -165,6 +170,8 @@ export async function POST(req: NextRequest) {
         date: t.date,
         description: t.description,
         counterparty: t.counterparty ?? null,
+        counterpartyName: t.counterpartyName ?? null,
+        counterpartyAccount: t.counterpartyAccount ?? null,
         amount: Math.abs(t.amount),
         type,
         category,
