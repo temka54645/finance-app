@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { User, Building2, Loader2, ArrowRight, BarChart2, Check } from "lucide-react";
+import Image from "next/image";
+import { User, Building2, Loader2, ArrowRight, Check } from "lucide-react";
 
 type UserType = "personal" | "business";
 
@@ -44,13 +45,15 @@ export default function OnboardingPage() {
 
       <div className="relative mx-auto flex min-h-screen max-w-3xl flex-col items-center justify-center px-6 py-12">
         {/* Brand */}
-        <div className="mb-10 flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 shadow-lg shadow-blue-500/30">
-            <BarChart2 className="h-5 w-5 text-white" />
-          </div>
-          <span className="text-base font-semibold tracking-tight text-slate-900">
-            FinMate
-          </span>
+        <div className="mb-10 flex items-center justify-center">
+          <Image
+            src="/finmate-logo.png"
+            width={1618}
+            height={512}
+            alt="FinMate"
+            priority
+            className="h-10 w-auto"
+          />
         </div>
 
         {/* Title */}

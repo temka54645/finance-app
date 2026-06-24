@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
-import { BarChart2, ShieldCheck, Sparkles, TrendingUp } from "lucide-react";
+import Image from "next/image";
+import { ShieldCheck, Sparkles, TrendingUp } from "lucide-react";
 import { redirectIfAuthenticated } from "@/lib/route-guards";
 
 export default async function AuthLayout({ children }: { children: ReactNode }) {
@@ -18,13 +19,15 @@ export default async function AuthLayout({ children }: { children: ReactNode }) 
       <div className="relative mx-auto flex min-h-screen w-full max-w-6xl flex-col lg:flex-row">
         {/* Brand panel (desktop only) */}
         <aside className="hidden flex-1 flex-col justify-between p-12 lg:flex">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 shadow-lg shadow-blue-500/30">
-              <BarChart2 className="h-5 w-5 text-white" />
-            </div>
-            <span className="text-base font-semibold tracking-tight text-slate-900">
-              FinMate
-            </span>
+          <div className="flex items-center">
+            <Image
+              src="/finmate-logo.png"
+              width={1618}
+              height={512}
+              alt="FinMate"
+              priority
+              className="h-9 w-auto"
+            />
           </div>
 
           <div className="space-y-8">
@@ -65,13 +68,15 @@ export default async function AuthLayout({ children }: { children: ReactNode }) 
         <main className="flex flex-1 items-center justify-center p-6 sm:p-10">
           <div className="w-full max-w-md">
             {/* Mobile brand */}
-            <div className="mb-8 flex items-center justify-center gap-3 lg:hidden">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 shadow-lg shadow-blue-500/30">
-                <BarChart2 className="h-5 w-5 text-white" />
-              </div>
-              <span className="text-base font-semibold tracking-tight text-slate-900">
-                FinMate
-              </span>
+            <div className="mb-8 flex items-center justify-center lg:hidden">
+              <Image
+                src="/finmate-logo.png"
+                width={1618}
+                height={512}
+                alt="FinMate"
+                priority
+                className="h-9 w-auto"
+              />
             </div>
             {children}
           </div>
