@@ -2,7 +2,8 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Lock, Mail, Loader2, AlertCircle, ShieldCheck } from "lucide-react";
+import Image from "next/image";
+import { Lock, Mail, Loader2, AlertCircle } from "lucide-react";
 import { adminLoginAction } from "./actions";
 
 export default function AdminLoginPage() {
@@ -41,9 +42,14 @@ export default function AdminLoginPage() {
         <div className="w-full max-w-md">
           {/* Brand */}
           <div className="mb-8 flex flex-col items-center gap-3">
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 shadow-lg shadow-blue-500/30">
-              <ShieldCheck className="h-6 w-6 text-white" />
-            </div>
+            <Image
+              src="/finmate-mark.png"
+              width={48}
+              height={48}
+              alt="FinMate"
+              priority
+              className="h-12 w-12 rounded-xl shadow-lg shadow-blue-500/20"
+            />
             <div className="text-center">
               <span className="text-base font-semibold tracking-tight text-slate-900">
                 FinMate <span className="text-blue-600">Админ</span>

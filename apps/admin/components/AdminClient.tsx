@@ -2,9 +2,10 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 import { signOut } from "next-auth/react";
 import {
-  Shield, Users, Database, Activity, TrendingUp, TrendingDown,
+  Users, Database, Activity, TrendingUp, TrendingDown,
   Search, Filter, ChevronDown, Mail, Crown, RefreshCw,
   Building2, User as UserIcon, FileText, Receipt, DollarSign,
   MessageSquare, Bug, Lightbulb, HelpCircle, Clock, CheckCircle2,
@@ -178,9 +179,14 @@ export default function AdminClient() {
       <header className="relative z-20 border-b border-slate-200 bg-white/80 backdrop-blur-xl sticky top-0">
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-6 py-4">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 shadow-lg shadow-indigo-500/30">
-              <Shield className="h-5 w-5 text-white" />
-            </div>
+            <Image
+              src="/finmate-mark.png"
+              width={40}
+              height={40}
+              alt="FinMate"
+              priority
+              className="h-10 w-10 rounded-xl shadow-lg shadow-indigo-500/20"
+            />
             <div className="min-w-0">
               <h1 className="text-base font-semibold tracking-tight text-slate-900">Бүтээгчийн самбар</h1>
               <p className="text-xs text-slate-500">Системийн удирдлага · нууцлал</p>
