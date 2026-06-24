@@ -25,5 +25,7 @@ export default auth(async (req) => {
 });
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|.*\\.svg).*)"],
+  // Static asset-уудыг (зураг, favicon) auth-аас гадуур үлдээнэ — эс бөгөөс
+  // public/ доторх лого зэрэг png/jpg файлууд /login руу 307 redirect болно.
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|avif|ico)$).*)"],
 };
