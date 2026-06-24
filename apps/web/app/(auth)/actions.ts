@@ -1,7 +1,7 @@
 "use server";
 
 import bcrypt from "bcryptjs";
-import { randomBytes } from "node:crypto";
+import { randomInt } from "node:crypto";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { signIn } from "@/auth";
@@ -19,10 +19,11 @@ export type SignupResult =
 
 export type ActionResult = { ok: true } | { ok: false; error: string };
 
-const VERIFY_TOKEN_TTL_MS = 24 * 60 * 60 * 1000; // 24 цаг
+const VERIFY_TOKEN_TTL_MS = 15 * 60 * 1000; // 15 минут (OTP код)
 
-function generateToken(): string {
-  return randomBytes(32).toString("hex");
+/** Криптографийн хувьд найдвартай 6 оронтой код (100000–999999). */
+function generateCode(): string {
+  return String(randomInt(100000, 1000000));
 }
 
 export async function signupAction(formData: FormData): Promise<SignupResult> {
@@ -50,17 +51,17 @@ export async function signupAction(formData: FormData): Promise<SignupResult> {
     select: { id: true, email: true, name: true },
   });
 
-  // Verification token үүсгээд email илгээнэ
-  const token = generateToken();
+  // Verification код үүсгээд email илгээнэ
+  const code = generateCode();
   await prisma.verificationToken.create({
     data: {
       identifier: lowerEmail,
-      token,
+      token: code,
       expires: new Date(Date.now() + VERIFY_TOKEN_TTL_MS),
     },
   });
 
-  const mail = await sendVerificationEmail({ email: user.email, token, name: user.name });
+  const mail = await sendVerificationEmail({ email: user.email, code, name: user.name });
   if (!mail.ok) {
     // Email явахгүй боловч бүртгэл амжилттай. Token DB-д бий тул дараа resend боломжтой.
     console.error("[signup] verification email failed:", mail.error);
@@ -77,19 +78,19 @@ export async function resendVerificationAction(formData: FormData): Promise<Acti
   if (!user) return { ok: false, error: "Хэрэглэгч олдсонгүй" };
   if (user.emailVerified) return { ok: false, error: "Энэ имэйл аль хэдийн баталгаажсан байна" };
 
-  // Хуучин token-уудыг устгаад шинэ үүсгэнэ
+  // Хуучин код(ууд)-ыг устгаад шинэ үүсгэнэ
   await prisma.verificationToken.deleteMany({ where: { identifier: email } });
 
-  const token = generateToken();
+  const code = generateCode();
   await prisma.verificationToken.create({
     data: {
       identifier: email,
-      token,
+      token: code,
       expires: new Date(Date.now() + VERIFY_TOKEN_TTL_MS),
     },
   });
 
-  const mail = await sendVerificationEmail({ email, token, name: user.name });
+  const mail = await sendVerificationEmail({ email, code, name: user.name });
   if (!mail.ok) return { ok: false, error: mail.error ?? "Email илгээж чадсангүй" };
   return { ok: true };
 }

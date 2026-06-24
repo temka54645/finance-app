@@ -5,6 +5,29 @@ FinMate-ийн чухал өөрчлөлтүүд. Формат нь [Keep a Chan
 
 ## [2026-06-24]
 
+### Changed — Имэйл баталгаажуулалт (LINK → 6 оронтой OTP код)
+- **Баталгаажуулах линкийг 6 оронтой код болгож сольсон.** Хэрэглэгч бүртгүүлмэгц
+  имэйлээр ирсэн 6 оронтой кодыг апп дээрх талбарт оруулж баталгаажуулна (өмнө нь
+  линк дээр дардаг байсан). Spam folder-оос линк хайхгүйгээр кодыг хуулж оруулж
+  болох тул найдвартай.
+- **Кодын хүчинтэй хугацаа 24 цаг → 15 минут** болсон (OTP-д тохирсон).
+- **Brute-force хамгаалалт** — буруу код 5 удаа оруулбал код хүчингүй болж, шинэ код
+  хүсэх шаардлагатай (`VerificationToken.attempts` багана). Кодыг `identifier+token`
+  хослолоор хайдаг тул `token`-ийн global unique constraint-г хассан.
+  ⚠ **Deploy: `npx prisma db push` ажиллуулж schema-г prod DB-д тусгана.**
+- Файлууд: `packages/db/prisma/schema.prisma`, `apps/web/lib/mail.ts`,
+  `apps/web/app/(auth)/actions.ts`, `apps/web/app/api/verify-email/route.ts`,
+  `apps/web/app/verify-email/page.tsx`, `apps/web/app/(auth)/signup/page.tsx`.
+
+### Changed — Имэйл deliverability (spam-аас сэргийлэх)
+- **`mail.ts`-д plain-text хувилбар нэмсэн** (multipart/alternative) — зөвхөн HTML
+  байсныг spam filter сэжиглэдэг байсныг засна.
+- **`List-Unsubscribe` + `List-Unsubscribe-Post: One-Click` header** нэмсэн —
+  Gmail/Yahoo-ийн bulk-sender дүрэмд эерэгээр үнэлэгдэнэ.
+- ⚠ **DNS: `_dmarc.finmate.mn` TXT record байхгүй байсан** (spam-ийн гол шалтгаан).
+  Cloudflare-т нэмэх ёстой: `v=DMARC1; p=none; rua=mailto:temka21311@gmail.com;
+  fo=1; adkim=r; aspf=r`. (DKIM `resend._domainkey` ба SPF `send.finmate.mn` бэлэн.)
+
 ### Added (Нэмэгдсэн)
 - **FinMate brand assets** — `finmate-logo.png` (бүтэн lockup), `finmate-mark.png`
   (дугуй mark), favicon set (`icon.png` 512, `apple-icon.png` 180, `favicon.ico`).

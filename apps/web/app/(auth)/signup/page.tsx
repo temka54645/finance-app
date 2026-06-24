@@ -2,19 +2,18 @@
 
 import { useState, useTransition } from "react";
 import Link from "next/link";
-import { Loader2, User, Mail, Lock, AlertCircle, CheckCircle2 } from "lucide-react";
-import { signupAction, resendVerificationAction } from "../actions";
+import { useRouter } from "next/navigation";
+import { Loader2, User, Mail, Lock, AlertCircle } from "lucide-react";
+import { signupAction } from "../actions";
 import GoogleSignInButton from "@/components/GoogleSignInButton";
 
 const inputBase =
   "w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-10 pr-3 text-sm text-slate-900 placeholder:text-slate-400 transition-all focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/15";
 
 export default function SignupPage() {
+  const router = useRouter();
   const [pending, startTransition] = useTransition();
-  const [resendPending, startResend] = useTransition();
   const [error, setError] = useState<string | null>(null);
-  const [verifyEmail, setVerifyEmail] = useState<string | null>(null);
-  const [resendOk, setResendOk] = useState(false);
 
   const onSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -29,70 +28,13 @@ export default function SignupPage() {
     startTransition(async () => {
       const res = await signupAction(formData);
       if (res.ok) {
-        setVerifyEmail(res.email);
+        // Код оруулах хуудас руу шилжинэ (имэйлийг дамжуулна).
+        router.push(`/verify-email?email=${encodeURIComponent(res.email)}`);
       } else {
         setError(res.error);
       }
     });
   };
-
-  const onResend = () => {
-    if (!verifyEmail) return;
-    setError(null);
-    setResendOk(false);
-    startResend(async () => {
-      const fd = new FormData();
-      fd.set("email", verifyEmail);
-      const res = await resendVerificationAction(fd);
-      if (res.ok) setResendOk(true);
-      else setError(res.error);
-    });
-  };
-
-  // Success screen
-  if (verifyEmail) {
-    return (
-      <div className="rounded-2xl border border-slate-200 bg-white/80 p-8 shadow-xl shadow-blue-200/30 backdrop-blur-xl text-center">
-        <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-emerald-100 text-emerald-600">
-          <CheckCircle2 className="h-7 w-7" />
-        </div>
-        <h1 className="text-xl font-semibold tracking-tight text-slate-900">Бүртгэл амжилттай!</h1>
-        <p className="mt-2 text-sm text-slate-600">
-          <span className="font-medium text-slate-900">{verifyEmail}</span> хаягруу баталгаажуулах линк илгээгдсэн.
-        </p>
-        <p className="mt-1 text-xs text-slate-500">
-          Имэйлээ шалгаад линк дээр дарж бүртгэлээ баталгаажуулна уу. Линк нь 24 цагийн дотор хүчинтэй.
-        </p>
-
-        {resendOk && (
-          <div className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
-            Шинэ баталгаажуулах линк илгээгдлээ
-          </div>
-        )}
-        {error && (
-          <div className="mt-4 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-            {error}
-          </div>
-        )}
-
-        <div className="mt-6 space-y-2">
-          <button
-            onClick={onResend}
-            disabled={resendPending}
-            className="inline-flex items-center gap-2 text-sm font-medium text-blue-600 hover:text-blue-700 disabled:opacity-50"
-          >
-            {resendPending && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-            Линк дахин илгээх
-          </button>
-          <div>
-            <Link href="/login" className="text-sm text-slate-500 hover:text-slate-700">
-              Нэвтрэх хуудас руу буцах
-            </Link>
-          </div>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="rounded-2xl border border-slate-200 bg-white/80 p-8 shadow-xl shadow-blue-200/30 backdrop-blur-xl">

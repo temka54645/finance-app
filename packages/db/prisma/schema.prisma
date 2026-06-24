@@ -109,8 +109,12 @@ model Session {
 
 model VerificationToken {
   identifier String
-  token      String   @unique
+  /// 6 оронтой OTP код. Global unique БИШ — өөр хэрэглэгчдэд ижил код таарч
+  /// болзошгүй тул identifier+token хослолоор хайна.
+  token      String
   expires    DateTime
+  /// Буруу оролдлогын тоо — brute-force-оос хамгаалах (5 удаа буруувал хүчингүй).
+  attempts   Int      @default(0)
 
   @@unique([identifier, token])
 }

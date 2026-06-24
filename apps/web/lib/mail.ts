@@ -12,20 +12,26 @@ const APP_URL = process.env.NEXTAUTH_URL ?? process.env.APP_URL ?? "http://local
 
 const resend = RESEND_API_KEY ? new Resend(RESEND_API_KEY) : null;
 
+/** Имэйл доторх "захиалга цуцлах" / гомдол мэдэгдэх хаяг (deliverability-д тус болно). */
+const UNSUBSCRIBE_MAILTO = process.env.MAIL_UNSUBSCRIBE ?? "noreply@finmate.mn";
+
 interface SendVerificationOptions {
   /** Хүлээн авагчийн email */
   email: string;
-  /** Баталгаажуулах token (URL-д явна) */
-  token: string;
+  /** 6 оронтой баталгаажуулах код */
+  code: string;
   /** Дэлгэцэнд харагдах хэрэглэгчийн нэр (optional) */
   name?: string | null;
 }
 
-export async function sendVerificationEmail({ email, token, name }: SendVerificationOptions) {
-  const verifyUrl = `${APP_URL}/verify-email?token=${encodeURIComponent(token)}`;
+export async function sendVerificationEmail({ email, code, name }: SendVerificationOptions) {
+  const verifyUrl = `${APP_URL}/verify-email?email=${encodeURIComponent(email)}`;
   const greeting = name ? `Сайн байна уу, ${name}!` : "Сайн байна уу!";
 
-  const subject = "FinMate — имэйл баталгаажуулна уу";
+  const subject = `FinMate баталгаажуулах код: ${code}`;
+
+  // Кодыг "1 2 3 4 5 6" хэлбэрээр зайтай харуулна — уншихад/хуулахад хялбар.
+  const spacedCode = code.split("").join(" ");
 
   const html = `
     <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 560px; margin: 0 auto; padding: 24px; color: #0f172a;">
@@ -35,18 +41,16 @@ export async function sendVerificationEmail({ email, token, name }: SendVerifica
       </div>
       <div style="background: #f8fafc; border-radius: 16px; padding: 24px; border: 1px solid #e2e8f0;">
         <p style="margin: 0 0 16px; font-size: 16px;">${greeting}</p>
-        <p style="margin: 0 0 16px; color: #334155; font-size: 14px; line-height: 1.6;">
-          Танай имэйл хаягийг баталгаажуулахын тулд доорх товчийг дарна уу.
-          Энэхүү линк нь 24 цагийн дотор хүчинтэй.
+        <p style="margin: 0 0 8px; color: #334155; font-size: 14px; line-height: 1.6;">
+          Имэйл хаягаа баталгаажуулахын тулд доорх 6 оронтой кодыг апп дээрх талбарт оруулна уу.
         </p>
         <div style="text-align: center; margin: 24px 0;">
-          <a href="${verifyUrl}" style="display: inline-block; background: linear-gradient(135deg, #3b82f6, #6366f1); color: white; text-decoration: none; padding: 12px 32px; border-radius: 12px; font-weight: 600; font-size: 14px;">
-            Имэйл баталгаажуулах
-          </a>
+          <div style="display: inline-block; background: #eef2ff; border: 1px solid #c7d2fe; border-radius: 14px; padding: 16px 28px; font-size: 32px; font-weight: 700; letter-spacing: 6px; color: #1e293b; font-family: 'SFMono-Regular', Consolas, monospace;">
+            ${spacedCode}
+          </div>
         </div>
         <p style="margin: 16px 0 0; color: #64748b; font-size: 12px; line-height: 1.5;">
-          Хэрэв товч ажиллахгүй бол энэ хаягийг хуулж browser-д тавьна уу:<br>
-          <span style="color: #2563eb; word-break: break-all;">${verifyUrl}</span>
+          Энэ код <strong>15 минутын</strong> дотор хүчинтэй. Кодыг хэн нэгэнтэй бүү хуваалцаарай.
         </p>
       </div>
       <p style="margin: 24px 0 0; text-align: center; color: #94a3b8; font-size: 12px;">
@@ -55,9 +59,26 @@ export async function sendVerificationEmail({ email, token, name }: SendVerifica
     </div>
   `;
 
+  // Plain-text хувилбар — multipart/alternative болгож spam оноог бууруулна.
+  const text = [
+    greeting,
+    "",
+    "FinMate-д имэйл хаягаа баталгаажуулах код:",
+    "",
+    `    ${code}`,
+    "",
+    "Энэ кодыг апп дээрх баталгаажуулах талбарт оруулна уу.",
+    "Код 15 минутын дотор хүчинтэй. Кодыг хэн нэгэнтэй бүү хуваалцаарай.",
+    "",
+    "Хэрэв та бүртгэл үүсгээгүй бол энэ имэйлийг үл харгалзана уу.",
+    "",
+    "— FinMate",
+    APP_URL,
+  ].join("\n");
+
   if (!resend) {
-    console.warn("[mail] RESEND_API_KEY тохируулаагүй — verification email log-руу хэвлэгдлээ");
-    console.log("[mail] VERIFY URL:", verifyUrl);
+    console.warn("[mail] RESEND_API_KEY тохируулаагүй — verification код log-руу хэвлэгдлээ");
+    console.log("[mail] VERIFY CODE:", code, "for", email, "open:", verifyUrl);
     return { ok: true, dev: true } as const;
   }
 
@@ -67,6 +88,12 @@ export async function sendVerificationEmail({ email, token, name }: SendVerifica
       to: email,
       subject,
       html,
+      text,
+      // Deliverability: gmail/yahoo bulk-sender дүрэмд one-click unsubscribe сайнаар үнэлэгддэг.
+      headers: {
+        "List-Unsubscribe": `<mailto:${UNSUBSCRIBE_MAILTO}?subject=unsubscribe>`,
+        "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+      },
     });
     if (result.error) {
       console.error("[mail] Resend error:", result.error);
