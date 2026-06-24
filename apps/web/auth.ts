@@ -69,9 +69,70 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   session: { strategy: "jwt" },
   pages: {
     signIn: "/login",
+    // Auth-ийн бүх алдаа (OAuthAccountNotLinked г.м.) login page дээр
+    // ?error=<code>-оор бууж, ойлгомжтой монгол мессеж харагдана.
+    error: "/login",
   },
   providers,
   callbacks: {
+    // Google OAuth-ийн "ижил имэйл" мөргөлдөөнийг аюулгүйгээр шийднэ.
+    // Энэ callback нь handleLoginOrRegister-ийн ӨМНӨ ажилладаг тул энд
+    // Account row үүсгэвэл доорх getUserByAccount тэр row-г олж, throw
+    // (OAuthAccountNotLinked) гаргахгүйгээр одоо байгаа хэрэглэгчээр нэвтрүүлнэ.
+    signIn: async ({ user, account, profile }) => {
+      // Зөвхөн Google OAuth-д хамаарна; Credentials болон бусад дамжина.
+      if (account?.provider !== "google") return true;
+
+      const email = (profile?.email ?? user?.email)?.toLowerCase();
+      if (!email) return "/login?error=GoogleNoEmail";
+
+      // Google имэйлээ баталсан эсэх (OIDC claim). Бараг үргэлж true.
+      const googleEmailVerified =
+        (profile as { email_verified?: boolean }).email_verified === true;
+
+      const existing = await prisma.user.findUnique({
+        where: { email },
+        select: {
+          id: true,
+          emailVerified: true,
+          accounts: { select: { provider: true } },
+        },
+      });
+
+      // Шинэ хэрэглэгч → доор шинэ User + Account автоматаар үүснэ.
+      if (!existing) return true;
+      // Аль хэдийн Google холбоотой → ердийн нэвтрэлт.
+      if (existing.accounts.some((a) => a.provider === "google")) return true;
+
+      // Мөргөлдөөн: ижил имэйлтэй (нууц үгийн) account байгаа ч Google линкгүй.
+      // Хоёр тал ч имэйл эзэмшлийг нотолсон үед л аюулгүйгээр линклэнэ:
+      //   existing.emailVerified — signup-ийн имэйл линкээр баталсан
+      //   googleEmailVerified    — Google баталсан
+      if (existing.emailVerified && googleEmailVerified) {
+        await prisma.account.create({
+          data: {
+            userId: existing.id,
+            type: account.type,
+            provider: account.provider,
+            providerAccountId: account.providerAccountId,
+            access_token: account.access_token ?? null,
+            refresh_token: account.refresh_token ?? null,
+            expires_at:
+              typeof account.expires_at === "number" ? account.expires_at : null,
+            token_type: account.token_type ?? null,
+            scope: account.scope ?? null,
+            id_token: account.id_token ?? null,
+            session_state:
+              (account as { session_state?: string | null }).session_state ?? null,
+          },
+        });
+        return true;
+      }
+
+      // Баталгаажаагүй credentials account руу Google-ийг автоматаар
+      // холбохгүй (account takeover-оос сэргийлнэ). Ойлгомжтой алдаа харуулна.
+      return "/login?error=OAuthAccountNotLinked";
+    },
     jwt: async ({ token, user, trigger }) => {
       // Шинэ login → user-аас id+userType+role-г token-руу хадгална
       if (user) {

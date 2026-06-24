@@ -1,11 +1,23 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Loader2, Mail, Lock, AlertCircle, CheckCircle2 } from "lucide-react";
 import { loginAction, resendVerificationAction } from "../actions";
 import GoogleSignInButton from "@/components/GoogleSignInButton";
+
+// NextAuth алдааны кодыг хэрэглэгчид ойлгомжтой монгол мессеж болгоно.
+// Алдаа гарвал auth нь /login?error=<code> руу буцаадаг (pages.error="/login").
+const AUTH_ERROR_MESSAGES: Record<string, string> = {
+  OAuthAccountNotLinked:
+    "Энэ имэйл хаяг нууц үгээр бүртгэлтэй байна. Эхлээд нууц үгээрээ нэвтэрнэ үү.",
+  GoogleNoEmail: "Google бүртгэлээс имэйл хаяг авч чадсангүй. Өөр аргаар нэвтэрнэ үү.",
+  AccessDenied: "Нэвтрэх зөвшөөрөл олдсонгүй. Дахин оролдоно уу.",
+  Configuration: "Системийн тохиргооны алдаа гарлаа. Түр хүлээгээд дахин оролдоно уу.",
+  Verification: "Баталгаажуулах линк хүчингүй болсон байна. Дахин илгээнэ үү.",
+};
+const AUTH_ERROR_FALLBACK = "Google-ээр нэвтрэхэд алдаа гарлаа. Дахин оролдоно уу.";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -15,6 +27,22 @@ export default function LoginPage() {
   const [needsVerification, setNeedsVerification] = useState(false);
   const [resendOk, setResendOk] = useState(false);
   const [lastEmail, setLastEmail] = useState("");
+
+  // OAuth (Google) урсгалаас ?error=<code>-оор буцаж ирэх алдааг харуулна.
+  // window дээр client-side уншина — useSearchParams-ийн Suspense шаардлагаас зайлсхийнэ.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const code = params.get("error");
+    if (!code) return;
+    // URL query-г hydration-ы дараа уншиж state-д тавих нь зорилготой (external
+    // system-тэй sync) — энэ rule энд false-positive.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setError(AUTH_ERROR_MESSAGES[code] ?? AUTH_ERROR_FALLBACK);
+    // URL-аас error-ыг цэвэрлэнэ — refresh хийхэд дахин гарахгүй.
+    params.delete("error");
+    const qs = params.toString();
+    window.history.replaceState(null, "", window.location.pathname + (qs ? `?${qs}` : ""));
+  }, []);
 
   const onSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
