@@ -98,8 +98,10 @@ export async function PATCH(req: NextRequest) {
   try {
     await requireAdmin();
     const body = await req.json();
-    const { id, role, plan, paymentStatus, planAmount, markPaid } = body as {
+    const { id, name, userType, role, plan, paymentStatus, planAmount, markPaid } = body as {
       id?: string;
+      name?: string | null;
+      userType?: string | null;
       role?: string;
       plan?: string;
       paymentStatus?: string;
@@ -110,6 +112,16 @@ export async function PATCH(req: NextRequest) {
     if (!id) return NextResponse.json({ error: "id шаардлагатай" }, { status: 400 });
 
     const data: Record<string, unknown> = {};
+    if (name !== undefined) {
+      const trimmed = typeof name === "string" ? name.trim() : "";
+      data.name = trimmed === "" ? null : trimmed;
+    }
+    if (userType !== undefined) {
+      // "personal" | "business" | null (тохируулаагүй) дэмжинэ
+      if (userType === "personal" || userType === "business" || userType === null) {
+        data.userType = userType;
+      }
+    }
     if (role && ALLOWED_ROLES.includes(role as typeof ALLOWED_ROLES[number])) data.role = role;
     if (plan && ALLOWED_PLANS.includes(plan as typeof ALLOWED_PLANS[number])) {
       data.plan = plan;

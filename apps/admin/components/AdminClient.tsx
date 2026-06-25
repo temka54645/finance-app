@@ -10,6 +10,7 @@ import {
   Building2, User as UserIcon, FileText, Receipt, DollarSign,
   MessageSquare, Bug, Lightbulb, HelpCircle, Clock, CheckCircle2,
   Loader2, AlertCircle, Tags, LogOut,
+  X, Trash2, Save, BadgeCheck, CalendarDays, Hash, ArrowDownLeft, ArrowUpRight,
 } from "lucide-react";
 
 const fmt = (n: number) => n.toLocaleString("mn-MN", { maximumFractionDigits: 0 }) + "₮";
@@ -81,6 +82,38 @@ interface AdminIssue {
   user: { id: string; email: string; name: string | null };
 }
 
+interface UserDetail {
+  id: string;
+  email: string;
+  emailVerified: string | null;
+  name: string | null;
+  image: string | null;
+  userType: string | null;
+  role: string;
+  plan: string;
+  paymentStatus: string;
+  planAmount: number;
+  paidAt: string | null;
+  createdAt: string;
+  providers: string[];
+  statementCount: number;
+  issueCount: number;
+  categoryCount: number;
+  statements: {
+    id: string;
+    fileName: string;
+    bankName: string | null;
+    uploadedAt: string;
+    periodStart: string | null;
+    periodEnd: string | null;
+    txCount: number;
+  }[];
+  issues: { id: string; type: string; title: string; status: string; createdAt: string }[];
+  totalIncome: number;
+  totalExpense: number;
+  txCount: number;
+}
+
 function relativeTime(iso: string | null): string {
   if (!iso) return "—";
   const diff = (Date.now() - new Date(iso).getTime()) / 1000;
@@ -113,6 +146,9 @@ export default function AdminClient() {
   // Inline edit
   const [editingUser, setEditingUser] = useState<string | null>(null);
   const [savingUser, setSavingUser] = useState<string | null>(null);
+
+  // Detail drawer
+  const [detailUserId, setDetailUserId] = useState<string | null>(null);
 
   const fetchAll = useCallback(async () => {
     setLoading(true);
@@ -617,12 +653,20 @@ export default function AdminClient() {
                           {isSaving ? (
                             <Loader2 className="h-4 w-4 animate-spin text-indigo-500 inline-block" />
                           ) : (
-                            <button
-                              onClick={() => setEditingUser(isEditing ? null : u.id)}
-                              className="text-xs font-medium text-indigo-600 hover:text-indigo-700 hover:underline"
-                            >
-                              {isEditing ? "Дуусах" : "Засах"}
-                            </button>
+                            <div className="inline-flex items-center gap-3">
+                              <button
+                                onClick={() => setDetailUserId(u.id)}
+                                className="text-xs font-medium text-slate-600 hover:text-slate-900 hover:underline"
+                              >
+                                Дэлгэрэнгүй
+                              </button>
+                              <button
+                                onClick={() => setEditingUser(isEditing ? null : u.id)}
+                                className="text-xs font-medium text-indigo-600 hover:text-indigo-700 hover:underline"
+                              >
+                                {isEditing ? "Дуусах" : "Засах"}
+                              </button>
+                            </div>
                           )}
                         </td>
                       </tr>
@@ -738,6 +782,18 @@ export default function AdminClient() {
           © {new Date().getFullYear()} FinMate — Admin · /sys/control
         </p>
       </main>
+
+      {detailUserId && (
+        <UserDetailModal
+          userId={detailUserId}
+          onClose={() => setDetailUserId(null)}
+          onChanged={fetchAll}
+          onDeleted={() => {
+            setDetailUserId(null);
+            fetchAll();
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -863,6 +919,406 @@ function IssueStatusBadge({ status }: { status: string }) {
       <Icon className="h-3 w-3" />
       {conf.label}
     </span>
+  );
+}
+
+function fmtDate(iso: string | null): string {
+  if (!iso) return "—";
+  return new Date(iso).toLocaleDateString("mn-MN", {
+    year: "numeric", month: "2-digit", day: "2-digit",
+  });
+}
+
+const PLAN_OPTIONS = [
+  { v: "free", label: "Бичил (Free)" },
+  { v: "small", label: "Жижиг" },
+  { v: "medium", label: "Дунд" },
+  { v: "large", label: "Том" },
+] as const;
+
+function UserDetailModal({
+  userId, onClose, onChanged, onDeleted,
+}: {
+  userId: string;
+  onClose: () => void;
+  onChanged: () => void;
+  onDeleted: () => void;
+}) {
+  const [data, setData] = useState<UserDetail | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+
+  // Засварлаж буй талбарууд
+  const [form, setForm] = useState({
+    name: "",
+    userType: "" as "" | "personal" | "business",
+    role: "user",
+    plan: "free",
+    planAmount: 0,
+    paymentStatus: "active",
+  });
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/users/${userId}`);
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? "Алдаа гарлаа");
+      const u: UserDetail = json.user;
+      setData(u);
+      setForm({
+        name: u.name ?? "",
+        userType: (u.userType as "personal" | "business" | null) ?? "",
+        role: u.role,
+        plan: u.plan,
+        planAmount: u.planAmount,
+        paymentStatus: u.paymentStatus,
+      });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Алдаа гарлаа");
+    } finally {
+      setLoading(false);
+    }
+  }, [userId]);
+
+  useEffect(() => { load(); }, [load]);
+
+  // Esc дарж хаах
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  const save = async (extra?: { markPaid?: boolean }) => {
+    setSaving(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/users", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: userId,
+          name: form.name,
+          userType: form.userType === "" ? null : form.userType,
+          role: form.role,
+          plan: form.plan,
+          planAmount: form.planAmount,
+          paymentStatus: form.paymentStatus,
+          ...extra,
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? "Хадгалах үед алдаа гарлаа");
+      await load();
+      onChanged();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Хадгалах үед алдаа гарлаа");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const doDelete = async () => {
+    setDeleting(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/users/${userId}`, { method: "DELETE" });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? "Устгах үед алдаа гарлаа");
+      onDeleted();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Устгах үед алдаа гарлаа");
+      setDeleting(false);
+      setConfirmDelete(false);
+    }
+  };
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-900/50 p-4 backdrop-blur-sm sm:p-6"
+      onClick={onClose}
+    >
+      <div
+        className="relative my-4 w-full max-w-2xl rounded-2xl border border-slate-200 bg-white shadow-2xl"
+        onClick={e => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="flex items-start justify-between gap-4 border-b border-slate-100 p-6">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 text-sm font-semibold text-white">
+              {(data?.name || data?.email || "?").charAt(0).toUpperCase()}
+            </div>
+            <div className="min-w-0">
+              <h3 className="truncate text-base font-semibold text-slate-900">
+                {data?.name || data?.email?.split("@")[0] || "Хэрэглэгч"}
+              </h3>
+              <p className="flex items-center gap-1 truncate text-xs text-slate-500">
+                <Mail className="h-3 w-3" /> {data?.email ?? "…"}
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        {loading ? (
+          <div className="flex items-center justify-center gap-2 py-16 text-sm text-slate-500">
+            <Loader2 className="h-4 w-4 animate-spin" /> Ачаалж байна…
+          </div>
+        ) : !data ? (
+          <div className="py-16 text-center text-sm text-rose-600">{error ?? "Олдсонгүй"}</div>
+        ) : (
+          <div className="max-h-[70vh] space-y-6 overflow-y-auto p-6">
+            {error && (
+              <div className="flex items-center gap-2 rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">
+                <AlertCircle className="h-4 w-4 flex-shrink-0" /> {error}
+              </div>
+            )}
+
+            {/* Meta info */}
+            <div className="grid gap-3 sm:grid-cols-2">
+              <MetaRow icon={<Hash className="h-3.5 w-3.5" />} label="ID" value={data.id} mono />
+              <MetaRow icon={<CalendarDays className="h-3.5 w-3.5" />} label="Бүртгүүлсэн" value={fmtDate(data.createdAt)} />
+              <MetaRow
+                icon={<BadgeCheck className="h-3.5 w-3.5" />}
+                label="Имэйл баталгаажсан"
+                value={data.emailVerified ? fmtDate(data.emailVerified) : "Үгүй"}
+              />
+              <MetaRow
+                icon={<UserIcon className="h-3.5 w-3.5" />}
+                label="Нэвтрэх арга"
+                value={data.providers.length ? data.providers.join(", ") : "Имэйл/нууц үг"}
+              />
+            </div>
+
+            {/* Aggregate stats */}
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+              <MiniStat label="Гүйлгээ" value={fmtNum(data.txCount)} icon={<Database className="h-4 w-4" />} />
+              <MiniStat label="Хуулга" value={fmtNum(data.statementCount)} icon={<FileText className="h-4 w-4" />} />
+              <MiniStat label="Орлого" value={fmt(data.totalIncome)} icon={<ArrowDownLeft className="h-4 w-4" />} accent="emerald" />
+              <MiniStat label="Зарлага" value={fmt(data.totalExpense)} icon={<ArrowUpRight className="h-4 w-4" />} accent="rose" />
+            </div>
+
+            {/* Edit form */}
+            <section className="rounded-xl border border-slate-200 bg-slate-50/60 p-4">
+              <h4 className="mb-3 text-xs font-semibold uppercase tracking-wider text-slate-500">
+                Мэдээлэл засах
+              </h4>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <Field label="Нэр">
+                  <input
+                    value={form.name}
+                    onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
+                    placeholder="Нэр оруулаагүй"
+                    className="w-full rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100"
+                  />
+                </Field>
+                <Field label="Ангилал">
+                  <select
+                    value={form.userType}
+                    onChange={e => setForm(f => ({ ...f, userType: e.target.value as typeof f.userType }))}
+                    className="w-full rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100"
+                  >
+                    <option value="">Тохируулаагүй</option>
+                    <option value="personal">Хувь хүн</option>
+                    <option value="business">Байгууллага</option>
+                  </select>
+                </Field>
+                <Field label="Багц">
+                  <select
+                    value={form.plan}
+                    onChange={e => {
+                      const plan = e.target.value;
+                      setForm(f => ({ ...f, plan }));
+                    }}
+                    className="w-full rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100"
+                  >
+                    {PLAN_OPTIONS.map(o => <option key={o.v} value={o.v}>{o.label}</option>)}
+                  </select>
+                </Field>
+                <Field label="Сар тутмын төлбөр (₮)">
+                  <input
+                    type="number"
+                    value={form.planAmount}
+                    onChange={e => setForm(f => ({ ...f, planAmount: Number(e.target.value) }))}
+                    className="w-full rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm tabular-nums focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100"
+                  />
+                </Field>
+                <Field label="Төлбөрийн төлөв">
+                  <select
+                    value={form.paymentStatus}
+                    onChange={e => setForm(f => ({ ...f, paymentStatus: e.target.value }))}
+                    className="w-full rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100"
+                  >
+                    <option value="active">Идэвхтэй</option>
+                    <option value="overdue">Хугацаа хэтэрсэн</option>
+                    <option value="cancelled">Цуцалсан</option>
+                  </select>
+                </Field>
+                <Field label="Эрх">
+                  <select
+                    value={form.role}
+                    onChange={e => setForm(f => ({ ...f, role: e.target.value }))}
+                    className="w-full rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100"
+                  >
+                    <option value="user">Хэрэглэгч</option>
+                    <option value="admin">Админ</option>
+                  </select>
+                </Field>
+              </div>
+              <div className="mt-4 flex flex-wrap items-center gap-2">
+                <button
+                  onClick={() => save()}
+                  disabled={saving}
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-gradient-to-r from-indigo-500 to-purple-600 px-4 py-2 text-sm font-medium text-white shadow hover:opacity-95 disabled:opacity-60"
+                >
+                  {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                  Хадгалах
+                </button>
+                <button
+                  onClick={() => save({ markPaid: true })}
+                  disabled={saving}
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-700 hover:bg-emerald-100 disabled:opacity-60"
+                >
+                  <CheckCircle2 className="h-4 w-4" /> Төлбөр хүлээж авлаа
+                </button>
+                <span className="text-xs text-slate-400">
+                  Сүүлд төлсөн: {fmtDate(data.paidAt)}
+                </span>
+              </div>
+            </section>
+
+            {/* Statements */}
+            <section>
+              <h4 className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-500">
+                Хуулгууд ({data.statementCount})
+              </h4>
+              {data.statements.length === 0 ? (
+                <p className="py-3 text-center text-sm text-slate-400">Хуулга байхгүй</p>
+              ) : (
+                <div className="max-h-48 space-y-1 overflow-y-auto">
+                  {data.statements.map(s => (
+                    <div key={s.id} className="flex items-center justify-between gap-3 rounded-lg border border-slate-100 px-3 py-2 text-sm">
+                      <div className="min-w-0">
+                        <p className="truncate font-medium text-slate-800">{s.fileName}</p>
+                        <p className="text-xs text-slate-500">
+                          {s.bankName ?? "—"} · {fmtDate(s.uploadedAt)}
+                        </p>
+                      </div>
+                      <span className="flex-shrink-0 text-xs tabular-nums text-slate-500">
+                        {fmtNum(s.txCount)} гүйлгээ
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </section>
+
+            {/* Issues */}
+            {data.issues.length > 0 && (
+              <section>
+                <h4 className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-500">
+                  Санал / Алдаа ({data.issueCount})
+                </h4>
+                <div className="max-h-40 space-y-1 overflow-y-auto">
+                  {data.issues.map(i => (
+                    <div key={i.id} className="flex items-center justify-between gap-3 rounded-lg border border-slate-100 px-3 py-2 text-sm">
+                      <p className="truncate text-slate-800">{i.title}</p>
+                      <IssueStatusBadge status={i.status} />
+                    </div>
+                  ))}
+                </div>
+              </section>
+            )}
+
+            {/* Danger zone */}
+            <section className="rounded-xl border border-rose-200 bg-rose-50/50 p-4">
+              <h4 className="text-xs font-semibold uppercase tracking-wider text-rose-700">
+                Аюултай бүс
+              </h4>
+              <p className="mt-1 text-xs text-rose-600/80">
+                Хэрэглэгчийг устгахад түүний бүх хуулга, гүйлгээ, ангилал, санал зэрэг
+                холбогдох мэдээлэл бүрэн арилна. Энэ үйлдлийг буцаах боломжгүй.
+              </p>
+              {confirmDelete ? (
+                <div className="mt-3 flex flex-wrap items-center gap-2">
+                  <span className="text-sm font-medium text-rose-700">Итгэлтэй байна уу?</span>
+                  <button
+                    onClick={doDelete}
+                    disabled={deleting}
+                    className="inline-flex items-center gap-1.5 rounded-lg bg-rose-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-rose-700 disabled:opacity-60"
+                  >
+                    {deleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                    Тийм, устга
+                  </button>
+                  <button
+                    onClick={() => setConfirmDelete(false)}
+                    disabled={deleting}
+                    className="rounded-lg px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-100"
+                  >
+                    Болих
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={() => setConfirmDelete(true)}
+                  className="mt-3 inline-flex items-center gap-1.5 rounded-lg border border-rose-300 bg-white px-3 py-1.5 text-sm font-medium text-rose-700 hover:bg-rose-50"
+                >
+                  <Trash2 className="h-4 w-4" /> Хэрэглэгчийг устгах
+                </button>
+              )}
+            </section>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function MetaRow({ icon, label, value, mono }: {
+  icon: React.ReactNode; label: string; value: string; mono?: boolean;
+}) {
+  return (
+    <div className="flex items-center gap-2 rounded-lg border border-slate-100 px-3 py-2">
+      <span className="text-slate-400">{icon}</span>
+      <div className="min-w-0">
+        <p className="text-[10px] uppercase tracking-wide text-slate-400">{label}</p>
+        <p className={`truncate text-sm text-slate-800 ${mono ? "font-mono text-xs" : ""}`}>{value}</p>
+      </div>
+    </div>
+  );
+}
+
+function MiniStat({ label, value, icon, accent }: {
+  label: string; value: string; icon: React.ReactNode; accent?: "emerald" | "rose";
+}) {
+  const tone = accent === "emerald" ? "text-emerald-600"
+    : accent === "rose" ? "text-rose-600" : "text-slate-700";
+  return (
+    <div className="rounded-xl border border-slate-200 bg-white p-3">
+      <div className={`flex items-center gap-1.5 ${tone}`}>{icon}
+        <span className="text-[10px] uppercase tracking-wide text-slate-400">{label}</span>
+      </div>
+      <p className={`mt-1 truncate text-sm font-semibold tabular-nums ${tone}`}>{value}</p>
+    </div>
+  );
+}
+
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <label className="block">
+      <span className="mb-1 block text-xs font-medium text-slate-600">{label}</span>
+      {children}
+    </label>
   );
 }
 
