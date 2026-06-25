@@ -143,10 +143,6 @@ export default function AdminClient() {
   // Issues filters
   const [issueStatusFilter, setIssueStatusFilter] = useState<"all" | "new" | "in_progress" | "resolved" | "wont_fix">("all");
 
-  // Inline edit
-  const [editingUser, setEditingUser] = useState<string | null>(null);
-  const [savingUser, setSavingUser] = useState<string | null>(null);
-
   // Detail drawer
   const [detailUserId, setDetailUserId] = useState<string | null>(null);
 
@@ -176,22 +172,6 @@ export default function AdminClient() {
   }, [search, userTypeFilter, roleFilter, planFilter, issueStatusFilter]);
 
   useEffect(() => { fetchAll(); }, [fetchAll]);
-
-  const updateUser = async (id: string, patch: Partial<AdminUser> & { markPaid?: boolean }) => {
-    setSavingUser(id);
-    try {
-      const res = await fetch("/api/users", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id, ...patch }),
-      });
-      if (!res.ok) throw new Error("update failed");
-      await fetchAll();
-    } finally {
-      setSavingUser(null);
-      setEditingUser(null);
-    }
-  };
 
   const updateIssue = async (id: string, status: string) => {
     await fetch("/api/issues", {
@@ -543,8 +523,6 @@ export default function AdminClient() {
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {users.map((u) => {
-                    const isEditing = editingUser === u.id;
-                    const isSaving = savingUser === u.id;
                     return (
                       <tr key={u.id} className="transition-colors hover:bg-slate-50/60">
                         <td className="px-6 py-3">
@@ -579,56 +557,15 @@ export default function AdminClient() {
                           )}
                         </td>
                         <td className="px-3 py-3">
-                          {isEditing ? (
-                            <div className="space-y-1">
-                              <select
-                                defaultValue={u.plan}
-                                onChange={e => updateUser(u.id, { plan: e.target.value })}
-                                className="text-xs border rounded px-1 py-0.5 w-full"
-                                disabled={isSaving}
-                              >
-                                <option value="free">Бичил (Free)</option>
-                                <option value="small">Жижиг</option>
-                                <option value="medium">Дунд</option>
-                                <option value="large">Том</option>
-                              </select>
-                              <input
-                                type="number"
-                                defaultValue={u.planAmount}
-                                onBlur={e => updateUser(u.id, { planAmount: Number(e.target.value) })}
-                                placeholder="MNT/сар"
-                                className="text-xs border rounded px-1 py-0.5 w-full"
-                                disabled={isSaving}
-                              />
-                              <button
-                                onClick={() => updateUser(u.id, { markPaid: true })}
-                                disabled={isSaving}
-                                className="text-[10px] text-emerald-600 hover:underline"
-                              >
-                                ✓ Төлбөр хүлээж авлаа
-                              </button>
-                            </div>
-                          ) : (
-                            <div className="space-y-0.5">
-                              <PlanBadge plan={u.plan} />
-                              <p className="text-[10px] text-slate-500 tabular-nums">
-                                {fmt(u.planAmount)} · <PaymentBadge status={u.paymentStatus} />
-                              </p>
-                            </div>
-                          )}
+                          <div className="space-y-0.5">
+                            <PlanBadge plan={u.plan} />
+                            <p className="text-[10px] text-slate-500 tabular-nums">
+                              {fmt(u.planAmount)} · <PaymentBadge status={u.paymentStatus} />
+                            </p>
+                          </div>
                         </td>
                         <td className="px-3 py-3">
-                          {isEditing ? (
-                            <select
-                              defaultValue={u.role}
-                              onChange={e => updateUser(u.id, { role: e.target.value })}
-                              className="text-xs border rounded px-1 py-0.5"
-                              disabled={isSaving}
-                            >
-                              <option value="user">User</option>
-                              <option value="admin">Admin</option>
-                            </select>
-                          ) : u.role === "admin" ? (
+                          {u.role === "admin" ? (
                             <span className="inline-flex items-center gap-1 rounded-full bg-gradient-to-r from-indigo-500 to-purple-600 px-2 py-0.5 text-xs font-semibold text-white">
                               <Crown className="h-3 w-3" /> Admin
                             </span>
@@ -650,24 +587,12 @@ export default function AdminClient() {
                         </td>
                         <td className="px-3 py-3 text-xs text-slate-500">{relativeTime(u.lastActive)}</td>
                         <td className="px-6 py-3 text-right">
-                          {isSaving ? (
-                            <Loader2 className="h-4 w-4 animate-spin text-indigo-500 inline-block" />
-                          ) : (
-                            <div className="inline-flex items-center gap-3">
-                              <button
-                                onClick={() => setDetailUserId(u.id)}
-                                className="text-xs font-medium text-slate-600 hover:text-slate-900 hover:underline"
-                              >
-                                Дэлгэрэнгүй
-                              </button>
-                              <button
-                                onClick={() => setEditingUser(isEditing ? null : u.id)}
-                                className="text-xs font-medium text-indigo-600 hover:text-indigo-700 hover:underline"
-                              >
-                                {isEditing ? "Дуусах" : "Засах"}
-                              </button>
-                            </div>
-                          )}
+                          <button
+                            onClick={() => setDetailUserId(u.id)}
+                            className="text-xs font-medium text-indigo-600 hover:text-indigo-700 hover:underline"
+                          >
+                            Дэлгэрэнгүй
+                          </button>
                         </td>
                       </tr>
                     );
