@@ -21,10 +21,19 @@ export const EXPENSE_CATEGORIES = getExpenseCategoryNames("personal");
 
 // Тогтсон keyword-уудаас түрүүлж шууд таних.
 // Эдгээр нь хоёулангаас (personal болон business) -д хамаатай universal rules.
+// ⚠ Дараалал чухал: matchKeyword эхний тохирлыг буцаадаг тул илүү тодорхой
+// (taxi) дүрмийг ерөнхий (tax) дүрмээс ӨМНӨ байрлуулна.
 const KEYWORD_RULES: Array<{ pattern: RegExp; type: "income" | "expense"; category: string }> = [
   { pattern: /шимтгэл|комисс|service\s*fee|bank\s*fee|шил.+гээний\s*шимтгэл/i, type: "expense", category: "Банкны шимтгэл" },
   { pattern: /цалин|tsalin|salary|payroll/i, type: "expense", category: "Цалин зарлага" },
-  { pattern: /татвар|tatvar|tax|нийгмийн.*даатгал/i, type: "expense", category: "Татвар" },
+  // Такси/taxi → Тээвэр. "татвар" дүрмээс ӨМНӨ шалгана — "taxi" дотор "tax"
+  // орсон тул андуурахаас сэргийлнэ.
+  { pattern: /такси|taxi/i, type: "expense", category: "Тээвэр" },
+  // POS терминалын худалдан авалт. \bpos(\b|\d) — "deposit", "position",
+  // "purpose" зэрэг доторх "pos"-той андуурахгүй; "POS", "POS-", "POS12345"-г барина.
+  { pattern: /\bpos(\b|\d)/i, type: "expense", category: "Худалдан авалт" },
+  // tax-ийг \b-ээр таслаж "taxi"-г ХАСна (татвар/tatvar нь монголоор хамаарна).
+  { pattern: /татвар|tatvar|\btax\b|нийгмийн.*даатгал/i, type: "expense", category: "Татвар" },
 ];
 
 function matchKeyword(description: string, type: "income" | "expense"): string | null {

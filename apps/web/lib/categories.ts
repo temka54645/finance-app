@@ -3,7 +3,7 @@ import {
   Banknote, Briefcase, Building2, Gift, HandCoins, LineChart, PiggyBank,
   Landmark, Coins, Wallet, ReceiptText, Award, TrendingUp,
   // Expense icons
-  ShoppingCart, UtensilsCrossed, Car, Home, Zap, Wifi, Phone, HeartPulse,
+  ShoppingCart, ShoppingBag, UtensilsCrossed, Car, Home, Zap, Wifi, Phone, HeartPulse,
   GraduationCap, Plane, Film, Shirt, Fuel, Bus, Baby, PawPrint, Dumbbell,
   Sparkles, CreditCard, Receipt, Hammer, BookOpen, Pill, Scissors, Music,
   Gamepad2, Cake, Tv, Megaphone, Truck, Package, Users, FileText, Globe,
@@ -117,6 +117,7 @@ const PERSONAL_EXPENSE: CategoryGroup[] = [
   {
     id: "personal", name: "Хувийн хэрэглээ", icon: Shirt,
     items: [
+      { id: "shopping", name: "Худалдан авалт", icon: ShoppingBag, color: "text-pink-600", bg: "bg-pink-50" },
       { id: "clothes", name: "Хувцас",     icon: Shirt,    color: "text-pink-600", bg: "bg-pink-50" },
       { id: "beauty",  name: "Гоо сайхан", icon: Sparkles, color: "text-rose-600", bg: "bg-rose-50" },
       { id: "haircut", name: "Үсчин",      icon: Scissors, color: "text-teal-600", bg: "bg-teal-50" },
@@ -177,6 +178,7 @@ const BUSINESS_EXPENSE: CategoryGroup[] = [
       { id: "office-rent",  name: "Оффис түрээс",          icon: Home,    color: "text-indigo-600", bg: "bg-indigo-50" },
       { id: "utilities",    name: "Ус, дулаан, цахилгаан", icon: Zap,     color: "text-amber-600",  bg: "bg-amber-50" },
       { id: "office-supply",name: "Бичиг хэргийн зардал",   icon: FileText,color: "text-slate-600", bg: "bg-slate-100" },
+      { id: "shopping",     name: "Худалдан авалт",         icon: ShoppingBag, color: "text-pink-600", bg: "bg-pink-50" },
       { id: "office-repair",name: "Засвар, үйлчилгээ",     icon: Hammer,  color: "text-stone-600",  bg: "bg-stone-100" },
     ],
   },
