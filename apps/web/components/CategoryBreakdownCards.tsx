@@ -135,7 +135,7 @@ function CategoryListCard({
         )}
       </div>
 
-      <div className="mt-3">
+      <div className="mt-3 max-h-80 overflow-y-auto pr-1">
         {rows.length ? (
           <ul className="divide-y divide-slate-100">
             {rows.map((r, i) => (
