@@ -20,8 +20,9 @@ export async function GET() {
 }
 
 export async function DELETE(req: NextRequest) {
+  let userId = "?";
   try {
-    const userId = await requireUserId();
+    userId = await requireUserId();
     const body = await req.json().catch(() => ({})) as { id?: string; ids?: string[] };
 
     // Хоёр формат дэмжинэ:
@@ -35,15 +36,40 @@ export async function DELETE(req: NextRequest) {
       return NextResponse.json({ error: "id эсвэл ids заавал хэрэгтэй" }, { status: 400 });
     }
 
-    // deleteMany — өөр tenant-ийн id үед P2025 throw хийхгүй, count = устгасан мөрийн тоо
-    const result = await prisma.statement.deleteMany({
-      where: { id: { in: idList }, userId },
-    });
-    return NextResponse.json({ success: result.count > 0, deleted: result.count });
+    // deleteMany — өөр tenant-ийн id үед P2025 throw хийхгүй, count = устгасан мөрийн тоо.
+    // Гүйлгээ нь Transaction.statementId FK-ийн ON DELETE CASCADE-аар хамт устна.
+    let deleted: number;
+    try {
+      const result = await prisma.statement.deleteMany({
+        where: { id: { in: idList }, userId },
+      });
+      deleted = result.count;
+    } catch (dbErr) {
+      // FK/cascade зэрэг DB алдааг ил гаргаж, чимээгүй 500 болгохгүй.
+      console.error(`[statements.DELETE] user=${userId} ids=${idList.join(",")} DB error:`, dbErr);
+      return NextResponse.json({
+        error: dbErr instanceof Error ? `Устгах үед DB алдаа: ${dbErr.message}` : "DB алдаа",
+      }, { status: 500 });
+    }
+
+    // Нэг ч мөр устгаагүй — id буруу эсвэл өөр хэрэглэгчийнх (tenant таарахгүй).
+    // Өмнө нь энэ тохиолдолд 200 буцаж, UI чимээгүй бүтэлгүйтдэг байсныг зассан.
+    if (deleted === 0) {
+      console.warn(`[statements.DELETE] user=${userId} ids=${idList.join(",")} matched 0 rows`);
+      return NextResponse.json({
+        error: "Хуулга олдсонгүй эсвэл аль хэдийн устсан байна.",
+        deleted: 0,
+      }, { status: 404 });
+    }
+
+    return NextResponse.json({ success: true, deleted });
   } catch (err) {
     if (err instanceof UnauthorizedError) {
       return NextResponse.json({ error: err.message }, { status: 401 });
     }
-    throw err;
+    console.error(`[statements.DELETE] user=${userId} unexpected error:`, err);
+    return NextResponse.json({
+      error: err instanceof Error ? err.message : "Серверийн алдаа",
+    }, { status: 500 });
   }
 }

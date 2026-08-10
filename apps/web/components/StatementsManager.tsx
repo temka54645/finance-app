@@ -46,9 +46,17 @@ export default function StatementsManager() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id }),
       });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.error ?? "Устгаж чадсангүй");
+      // JSON биш хариу (жиш: session дуусаад /login руу чиглүүлсэн HTML) → null.
+      const data = await res.json().catch(() => null);
+      // Амжилтыг status БА success флагаар БАТАЛНА — 200 боловч success:false
+      // (эсвэл JSON биш) үед чимээгүй өнгөрөхгүй.
+      if (!res.ok || !data?.success) {
+        throw new Error(
+          data?.error ??
+          (res.status === 401
+            ? "Нэвтрэх хугацаа дууссан байна. Дахин нэвтэрнэ үү."
+            : "Устгаж чадсангүй")
+        );
       }
       await fetchStatements();
     } catch (e) {
@@ -87,8 +95,15 @@ export default function StatementsManager() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ids }),
       });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error ?? "Устгаж чадсангүй");
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data?.success) {
+        throw new Error(
+          data?.error ??
+          (res.status === 401
+            ? "Нэвтрэх хугацаа дууссан байна. Дахин нэвтэрнэ үү."
+            : "Устгаж чадсангүй")
+        );
+      }
       await fetchStatements();
     } catch (e) {
       alert(e instanceof Error ? e.message : "Алдаа");
